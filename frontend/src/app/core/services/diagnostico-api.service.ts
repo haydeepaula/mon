@@ -6,6 +6,7 @@ import { Job } from '../models/api.models';
 import {
   Concordancia,
   Diagnostico,
+  DevolutivaInput,
   DiagnosticoInput,
   DiagnosticoItem,
   Escopo,
@@ -70,6 +71,19 @@ export class DiagnosticoApi {
 
   report(id: string) {
     return firstValueFrom(this.http.get(`${this.base}/${id}/relatorio`, { responseType: 'text' }));
+  }
+
+  reportDocx(id: string) {
+    const params = new HttpParams({ fromObject: { formato: 'docx' } });
+    return firstValueFrom(this.http.get(`${this.base}/${id}/relatorio`, { params, responseType: 'blob' }));
+  }
+
+  feedback(id: string, data: DevolutivaInput) {
+    return firstValueFrom(this.http.post<Diagnostico>(`${this.base}/${id}/devolutiva`, data));
+  }
+
+  clone(id: string, data: { nome?: string | null; llm_provider?: string | null; llm_model?: string | null; reasoning_level?: string | null }) {
+    return firstValueFrom(this.http.post<Diagnostico>(`${this.base}/${id}/clonar`, data));
   }
 
   metrics(id: string, referencia?: string | null) {

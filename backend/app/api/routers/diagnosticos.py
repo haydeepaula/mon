@@ -2,12 +2,15 @@
 
 import uuid
 from collections import Counter
+from typing import Literal
 
 from fastapi import APIRouter, status
 from fastapi.responses import Response
 
 from app.api.deps import AdminUser, DbSession
 from app.api.schemas.diagnosticos import (
+    ClonarIn,
+    DevolutivaIn,
     DiagnosticoCreate,
     DiagnosticoOut,
     DiagnosticoUpdate,
@@ -191,11 +194,38 @@ def issue_report(diagnostico_id: uuid.UUID, _: AdminUser, db: DbSession):
 
 
 @router.get("/{diagnostico_id}/relatorio")
-def get_report(diagnostico_id: uuid.UUID, _: AdminUser, db: DbSession, download: bool = False):
-    """Relatório em Markdown: o emitido ou, antes da emissão, uma prévia."""
-    conteudo = DiagnosticoService(db).relatorio(diagnostico_id)
+def get_report(
+    diagnostico_id: uuid.UUID, _: AdminUser, db: DbSession, download: bool = False, formato: Literal["md", "docx"] = "md"
+):
+    """Relatório (emitido ou, antes da emissão, uma prévia) em Markdown ou DOCX."""
+    service = DiagnosticoService(db)
+    if formato == "docx":
+        return Response(
+            service.relatorio_docx(diagnostico_id),
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers={"Content-Disposition": f'attachment; filename="relatorio-{diagnostico_id}.docx"'},
+        )
+    conteudo = service.relatorio(diagnostico_id)
     headers = {"Content-Disposition": f'attachment; filename="relatorio-{diagnostico_id}.md"'} if download else None
     return Response(conteudo, media_type="text/markdown; charset=utf-8", headers=headers)
+
+
+# --- etapa 8: devolutiva -----------------------------------------------------------------------------
+@router.post("/{diagnostico_id}/devolutiva", response_model=DiagnosticoOut)
+def feedback(diagnostico_id: uuid.UUID, body: DevolutivaIn, user: AdminUser, db: DbSession):
+    """Registra a apresentação à coordenação e ao NDE: aceito conclui; revisado reabre."""
+    diagnostico = DiagnosticoService(db).registrar_devolutiva(diagnostico_id, body.model_dump(mode="json"), user.id)
+    db.commit()
+    return diagnostico_out(diagnostico)
+
+
+# --- comparação entre modelos ------------------------------------------------------------------------
+@router.post("/{diagnostico_id}/clonar", response_model=DiagnosticoOut, status_code=status.HTTP_201_CREATED)
+def clone(diagnostico_id: uuid.UUID, body: ClonarIn, user: AdminUser, db: DbSession):
+    """Mesmo escopo e requisitos, outro modelo; a concordância é medida contra este diagnóstico."""
+    diagnostico = DiagnosticoService(db).clonar(diagnostico_id, body.model_dump(), user.id)
+    db.commit()
+    return diagnostico_out(diagnostico)
 
 
 # --- seção 3.8, nível 2 ---------------------------------------------------------------------------

@@ -105,7 +105,9 @@ Ver [14. Diagnóstico](14-diagnostico.md).
 | GET | `/diagnosticos/{id}/priorizacao` | Itens NC e PC em ordem de prioridade, com sugestões de G e U | 6 |
 | PUT | `/diagnosticos/{id}/itens/{item}/gut` | `{g, u, t}` de 1 a 5 | 6 |
 | POST | `/diagnosticos/{id}/relatorio` | Emite e congela o relatório | 7 |
-| GET | `/diagnosticos/{id}/relatorio?download=` | Relatório em Markdown (emitido ou prévia) | 7 |
+| GET | `/diagnosticos/{id}/relatorio?formato=md\|docx&download=` | Relatório em Markdown ou DOCX (emitido ou prévia) | 7 |
+| POST | `/diagnosticos/{id}/devolutiva` | `{data, participantes, resultado: aceito\|revisado, observacoes}` | 8 |
+| POST | `/diagnosticos/{id}/clonar` | Mesmo escopo com outro LLM (`{nome, llm_provider, llm_model, reasoning_level}`) | 3.8 |
 | GET | `/diagnosticos/{id}/metricas?referencia=` | Concordância: acordo, κ, matriz de confusão, causas | 3.8, nível 2 |
 
 ## Saúde

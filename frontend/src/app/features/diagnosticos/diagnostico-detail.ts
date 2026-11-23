@@ -18,8 +18,10 @@ import {
   TIPO_REQUISITO,
   ValidacaoInput,
 } from '../../core/models/diagnostico.models';
+import { ModelInfo, Provider } from '../../core/models/api.models';
 import { apiErrorMessage } from '../../core/services/api-error';
 import { ConfirmService } from '../../core/services/confirm.service';
+import { AdminApi } from '../../core/services/admin-api.service';
 import { DiagnosticoApi } from '../../core/services/diagnostico-api.service';
 import { DownloadService } from '../../core/services/download.service';
 import { ToastService } from '../../core/services/toast.service';
@@ -55,6 +57,7 @@ export class DiagnosticoDetail implements OnInit {
   private readonly toast = inject(ToastService);
   private readonly downloads = inject(DownloadService);
   private readonly confirm = inject(ConfirmService);
+  private readonly admin = inject(AdminApi);
   private readonly router = inject(Router);
 
   protected readonly diagnostico = signal<Diagnostico | null>(null);
@@ -69,6 +72,10 @@ export class DiagnosticoDetail implements OnInit {
   protected readonly gut = signal<LinhaGut[]>([]);
   protected readonly relatorio = signal<string | null>(null);
   protected readonly notas = [1, 2, 3, 4, 5];
+  protected readonly devolutiva = signal<{ data: string; participantes: string; resultado: 'aceito' | 'revisado'; observacoes: string } | null>(null);
+  protected readonly comparar = signal<{ provider: string; model: string; reasoning: string; nome: string } | null>(null);
+  protected readonly provedores = signal<Provider[]>([]);
+  protected readonly modelos = signal<ModelInfo[]>([]);
 
   protected readonly classificacoes = CLASSIFICACOES;
   protected readonly classInfo = CLASSIFICACAO_INFO;
@@ -153,7 +160,8 @@ export class DiagnosticoDetail implements OnInit {
 
   protected async carregarMetricas(): Promise<void> {
     try {
-      this.metricas.set(await this.api.metrics(this.id()));
+      // Diagnóstico clonado: compara as propostas com as decisões do diagnóstico de referência.
+      this.metricas.set(await this.api.metrics(this.id(), this.diagnostico()?.referencia_id));
     } catch (error) {
       this.toast.error(apiErrorMessage(error));
     }
@@ -353,5 +361,93 @@ export class DiagnosticoDetail implements OnInit {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   protected entradas(obj: object | undefined | null): [string, any][] {
     return Object.entries(obj ?? {});
+  }
+
+  // Exportação DOCX e devolutiva (etapas 7 e 8)
+  protected async baixarDocx(): Promise<void> {
+    try {
+      const blob = await this.api.reportDocx(this.id());
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `relatorio-${this.diagnostico()?.nome ?? this.id()}.docx`;
+      anchor.click();
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    } catch (error) {
+      this.toast.error(apiErrorMessage(error));
+    }
+  }
+
+  protected abrirDevolutiva(): void {
+    this.devolutiva.set({ data: new Date().toISOString().slice(0, 10), participantes: 'Coordenação do curso, NDE', resultado: 'aceito', observacoes: '' });
+  }
+
+  protected async registrarDevolutiva(): Promise<void> {
+    const form = this.devolutiva();
+    if (!form) return;
+    try {
+      this.diagnostico.set(
+        await this.api.feedback(this.id(), {
+          data: form.data || null,
+          participantes: form.participantes.split(',').map((p) => p.trim()).filter(Boolean),
+          resultado: form.resultado,
+          observacoes: form.observacoes.trim() || null,
+        }),
+      );
+      this.devolutiva.set(null);
+      this.toast.success(form.resultado === 'aceito' ? 'Diagnóstico concluído.' : 'Diagnóstico reaberto para revisão.');
+      await this.carregar();
+      this.carregarRelatorio();
+    } catch (error) {
+      this.toast.error(apiErrorMessage(error));
+    }
+  }
+
+  // Comparação entre modelos (seção 3.8)
+  protected async abrirComparacao(): Promise<void> {
+    try {
+      const provedores = (await this.admin.providers()).filter((p) => p.configured);
+      this.provedores.set(provedores);
+      const provider = provedores[0]?.id ?? 'google';
+      this.comparar.set({ provider, model: '', reasoning: 'low', nome: '' });
+      this.carregarModelos(provider);
+    } catch (error) {
+      this.toast.error(apiErrorMessage(error));
+    }
+  }
+
+  protected async carregarModelos(provider: string): Promise<void> {
+    this.modelos.set([]);
+    try {
+      this.modelos.set(await this.admin.models(provider));
+    } catch {
+      this.modelos.set([]);
+    }
+  }
+
+  protected async criarComparacao(): Promise<void> {
+    const form = this.comparar();
+    if (!form?.model.trim()) {
+      this.toast.error('Escolha o modelo.');
+      return;
+    }
+    try {
+      const clone = await this.api.clone(this.id(), {
+        nome: form.nome.trim() || null,
+        llm_provider: form.provider,
+        llm_model: form.model.trim(),
+        reasoning_level: form.reasoning,
+      });
+      this.comparar.set(null);
+      this.toast.success('Diagnóstico de comparação criado. Execute a verificação nele e veja a concordância.');
+      await this.router.navigate(['/admin/diagnosticos', clone.id]);
+      this.selecionadoId.set(null);
+      this.validacao.set(null);
+      this.metricas.set(null);
+      this.aba.set('revisao');
+      await this.carregar(true);
+    } catch (error) {
+      this.toast.error(apiErrorMessage(error));
+    }
   }
 }

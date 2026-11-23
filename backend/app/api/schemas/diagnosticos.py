@@ -105,3 +105,17 @@ class GutIn(BaseModel):
     u: int = Field(ge=1, le=5)
     t: int = Field(ge=1, le=5)
 
+
+class DevolutivaIn(BaseModel):
+    data: date | None = None
+    participantes: list[str] = []
+    resultado: Literal["aceito", "revisado"]
+    observacoes: str | None = Field(None, max_length=8000)
+
+
+class ClonarIn(BaseModel):
+    nome: str | None = Field(None, max_length=200)
+    llm_provider: str | None = Field(None, max_length=40)
+    llm_model: str | None = Field(None, max_length=120)
+    reasoning_level: Literal["low", "medium", "high"] | None = None
+

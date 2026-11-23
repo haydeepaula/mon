@@ -74,11 +74,24 @@ A ordem é G × U × T decrescente; empates são resolvidos por G, depois U, dep
 5. **Diligências:** requisitos com evidência insuficiente e o que pedir ao curso;
 6. **Apêndice:** concordância entre protótipo e consultor.
 
-A definição das ações corretivas fica fora do relatório, pois cabe à gestão do curso. Antes da emissão, `GET /relatorio` devolve uma prévia; a emissão (`POST /relatorio`) congela o conteúdo em `relatorio_md`, registra a data e bloqueia validação e priorização.
+A definição das ações corretivas fica fora do relatório, pois cabe à gestão do curso. Antes da emissão, `GET /relatorio` devolve uma prévia; a emissão (`POST /relatorio`) congela o conteúdo em `relatorio_md`, registra a data e bloqueia validação e priorização. O relatório pode ser baixado em Markdown ou em DOCX (`?formato=docx`, gerado com `python-docx` a partir do mesmo Markdown, em `relatorio_docx.py`).
+
+## 14.6.1 Devolutiva
+
+A etapa 8 registra a apresentação dos achados à coordenação e ao NDE (`POST /devolutiva`): data, participantes, resultado e observações.
+
+- **Aceito:** o diagnóstico é concluído (`concluido`).
+- **Revisado:** o relatório emitido vai para o histórico (`config.relatorios_anteriores`), validação e priorização são reabertas e um novo relatório deve ser emitido depois dos ajustes.
+
+Todas as devolutivas ficam registradas em `devolutiva.registros`.
 
 ## 14.7 Reprodutibilidade
 
 Cada execução da verificação registra em `diagnosticos.config.execucoes`: data, provedor e modelo do LLM, nível de raciocínio, parâmetros de recuperação e rerank, tamanho dos trechos, hash da instrução de sistema e um retrato da base institucional (id, nome, versão, hash e páginas com OCR de cada documento). O job usa o modelo registrado ao ser enfileirado, mesmo que a configuração mude no intervalo. Com isso se respondem às ameaças à validade da seção 3.8 (mudança de versão dos modelos dos provedores) e se preserva a cadeia de evidências (YIN, 2015).
+
+## 14.7.1 Comparação entre modelos
+
+`POST /clonar` cria um diagnóstico com os mesmos requisitos e escopo, sem propostas nem validações, apontando o original como **referência** e, opcionalmente, com outro provedor, modelo e nível de raciocínio do LLM. Depois de executar a verificação no clone, a aba Concordância compara as novas propostas com as decisões já registradas pelo consultor no diagnóstico de referência. Assim, a seção 3.8 pode comparar modelos variando um fator por vez sem pedir nova validação ao consultor. As causas de divergência valem apenas para as propostas que o consultor avaliou, e por isso não aparecem nessa comparação.
 
 ## 14.8 Concordância
 

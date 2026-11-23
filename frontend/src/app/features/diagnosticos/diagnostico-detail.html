@@ -24,9 +24,17 @@
           @if (execucao(); as e) {
             <span class="chip">LLM: {{ e['llm_model'] }}</span>
           }
+          @if (d.referencia_id) {
+            <a class="chip accent" [href]="'/admin/diagnosticos/' + d.referencia_id">comparação · ver referência</a>
+          }
         </div>
         <div class="actions">
           <button class="btn" (click)="carregar()"><app-icon name="refresh" [size]="15" /> Atualizar</button>
+          @if (d.status !== 'planejamento' && d.status !== 'verificando') {
+            <button class="btn" (click)="abrirComparacao()" title="Repetir a verificação com outro modelo e medir a concordância com estas decisões">
+              <app-icon name="cpu" [size]="14" /> Comparar com outro modelo
+            </button>
+          }
           @if (podeVerificar()) {
             <button class="btn primary" (click)="verificar()">
               <app-icon name="play" [size]="14" />
@@ -399,11 +407,29 @@
               </div>
               <div class="row">
                 <button class="btn" [disabled]="!relatorio()" (click)="baixarRelatorio()"><app-icon name="download" [size]="14" /> Markdown</button>
+                <button class="btn" [disabled]="!relatorio()" (click)="baixarDocx()"><app-icon name="download" [size]="14" /> DOCX</button>
+                @if (d.status === 'relatorio_emitido') {
+                  <button class="btn primary" (click)="abrirDevolutiva()"><app-icon name="check" [size]="14" /> Registrar devolutiva</button>
+                }
                 @if (!d.relatorio_emitido_em) {
                   <button class="btn primary" [disabled]="!podeEmitir()" (click)="emitirRelatorio()"><app-icon name="file-text" [size]="14" /> Emitir relatório</button>
                 }
               </div>
             </div>
+            @if (d.devolutiva.registros?.length) {
+              <div class="devolutivas">
+                <div class="section-title">Devolutivas (etapa 8)</div>
+                @for (r of d.devolutiva.registros; track r.registrado_em) {
+                  <div class="devolutiva">
+                    <span class="badge" [class]="r.resultado === 'aceito' ? 'success' : 'warning'">{{ r.resultado }}</span>
+                    <span>{{ r.data }} · {{ r.participantes.join(', ') || '—' }}</span>
+                    @if (r.observacoes) {
+                      <span class="muted">· {{ r.observacoes }}</span>
+                    }
+                  </div>
+                }
+              </div>
+            }
             <div class="card-body">
               @if (relatorio(); as md) {
                 <div class="markdown report" [innerHTML]="md | markdown"></div>
@@ -415,6 +441,12 @@
         }
 
         @case ('concordancia') {
+          @if (d.referencia_id) {
+            <div class="alert info">
+              <app-icon name="info" [size]="15" />
+              <span>Diagnóstico de comparação: as propostas deste modelo são comparadas com as decisões do consultor no diagnóstico de referência.</span>
+            </div>
+          }
           @if (metricas(); as m) {
             <div class="metric-cards">
               <div class="metric">
@@ -539,3 +571,88 @@
     }
   </div>
 </div>
+
+@if (devolutiva(); as f) {
+  <div class="modal-backdrop" (click)="devolutiva.set(null)">
+    <form class="modal" (click)="$event.stopPropagation()" (ngSubmit)="registrarDevolutiva()">
+      <div class="modal-header">
+        <h3>Registrar devolutiva</h3>
+        <p>Etapa 8: apresentação dos achados à coordenação e ao NDE. A definição das ações cabe à gestão do curso.</p>
+      </div>
+      <div class="modal-body">
+        <div class="field">
+          <label>Data</label>
+          <input class="input" type="date" name="data" [(ngModel)]="f.data" />
+        </div>
+        <div class="field">
+          <label>Participantes (separados por vírgula)</label>
+          <input class="input" name="participantes" [(ngModel)]="f.participantes" />
+        </div>
+        <div class="field">
+          <label>Resultado</label>
+          <select class="select" name="resultado" [(ngModel)]="f.resultado">
+            <option value="aceito">Aceito: conclui o diagnóstico</option>
+            <option value="revisado">Revisado: reabre validação e priorização (o relatório atual vai para o histórico)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Observações</label>
+          <textarea class="textarea" name="observacoes" rows="3" [(ngModel)]="f.observacoes"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn" (click)="devolutiva.set(null)">Cancelar</button>
+        <button type="submit" class="btn primary">Registrar</button>
+      </div>
+    </form>
+  </div>
+}
+
+@if (comparar(); as c) {
+  <div class="modal-backdrop" (click)="comparar.set(null)">
+    <form class="modal" (click)="$event.stopPropagation()" (ngSubmit)="criarComparacao()">
+      <div class="modal-header">
+        <h3>Comparar com outro modelo</h3>
+        <p>
+          Cria um diagnóstico com os mesmos requisitos e escopo. Depois de executar a verificação nele, a aba
+          Concordância compara as novas propostas com as decisões já registradas aqui (variação de um fator por vez).
+        </p>
+      </div>
+      <div class="modal-body">
+        <div class="field">
+          <label>Provedor</label>
+          <select class="select" name="provider" [(ngModel)]="c.provider" (ngModelChange)="carregarModelos($event)">
+            @for (p of provedores(); track p.id) {
+              <option [value]="p.id">{{ p.name }}</option>
+            }
+          </select>
+        </div>
+        <div class="field">
+          <label>Modelo</label>
+          <input class="input mono" name="model" list="modelos-comparacao" [(ngModel)]="c.model" placeholder="ex.: gemini-flash-lite-latest" />
+          <datalist id="modelos-comparacao">
+            @for (m of modelos(); track m.id) {
+              <option [value]="m.id">{{ m.display_name }}</option>
+            }
+          </datalist>
+        </div>
+        <div class="field">
+          <label>Nível de raciocínio</label>
+          <select class="select" name="reasoning" [(ngModel)]="c.reasoning">
+            <option value="low">Baixo</option>
+            <option value="medium">Médio</option>
+            <option value="high">Alto</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Nome (opcional)</label>
+          <input class="input" name="nome" [(ngModel)]="c.nome" />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn" (click)="comparar.set(null)">Cancelar</button>
+        <button type="submit" class="btn primary">Criar comparação</button>
+      </div>
+    </form>
+  </div>
+}

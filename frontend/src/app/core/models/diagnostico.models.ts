@@ -138,7 +138,7 @@ export interface Diagnostico {
   job_id: string | null;
   metricas: Partial<Concordancia>;
   relatorio_emitido_em: string | null;
-  devolutiva: Record<string, unknown>;
+  devolutiva: { registros?: DevolutivaRegistro[]; ultima?: DevolutivaRegistro };
   referencia_id: string | null;
   created_at: string;
   updated_at: string;
@@ -188,6 +188,18 @@ export interface DiagnosticoItem {
   gut_t: number | null;
   gut_sugestao: { g?: number; u?: number; motivo_g?: string; motivo_u?: string };
   prioridade: number | null;
+}
+
+export interface DevolutivaInput {
+  data: string | null;
+  participantes: string[];
+  resultado: 'aceito' | 'revisado';
+  observacoes: string | null;
+}
+
+export interface DevolutivaRegistro extends DevolutivaInput {
+  relatorio_emitido_em: string | null;
+  registrado_em: string;
 }
 
 export interface ValidacaoInput {

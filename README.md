@@ -15,7 +15,14 @@ Projeto desenvolvido como Trabalho de Conclusão de Curso em Engenharia de Produ
 - **Reindexação sem resíduos**: vetores versionados no Qdrant; a versão antiga só é removida após o sucesso da nova.
 - **Área administrativa**: upload por arrastar e soltar, jobs de sincronização, avaliação do RAG e seleção de modelos
   (Google Gemini e OpenAI) e parâmetros de recuperação.
-- **Avaliação do RAG**: hit rate, MRR, recall, precisão de contexto e LLM como juiz (fidelidade, relevância, correção).
+- **Avaliação do RAG**: hit rate, MRR, recall, precisão de contexto e LLM como juiz (fidelidade, relevância, correção),
+  também por requisito do framework.
+- **Modelo de diagnóstico** (TCC, seções 3.5 a 3.8):
+  - base dividida em coleções **normativa** e **institucional**;
+  - **framework de critérios** versionado, com revisão e validação pelo orientador;
+  - **verificação assistida**: para cada requisito, evidências do curso e proposta C/PC/NC/EI com citações;
+  - **validação pelo consultor** (opcionalmente cega), **priorização GUT**, **relatório** em Markdown e DOCX e **devolutiva**;
+  - **concordância** entre protótipo e consultor (percentual de acordo, kappa de Cohen) e comparação entre modelos.
 
 ## Tecnologias
 
@@ -57,6 +64,9 @@ Guia completo em [docs/10-execucao.md](docs/10-execucao.md).
 | [Referências](docs/09-referencias.md) | Referências bibliográficas (ABNT) |
 | [Execução](docs/10-execucao.md) | Instalação, configuração e testes |
 | [Metodologia](docs/11-metodologia.md) | Passo a passo do desenvolvimento (base para a metodologia do TCC) |
+| [Plano de diagnóstico](docs/12-plano-diagnostico.md) | Expansão para o framework de critérios e o método de consultoria |
+| [Framework de critérios](docs/13-framework-de-criterios.md) | Requisitos, versões, validação, importação e recuperação por requisito |
+| [Diagnóstico](docs/14-diagnostico.md) | Processo do Quadro 9: verificação, validação, GUT, relatório, devolutiva e concordância |
 
 ## Estrutura do repositório
 

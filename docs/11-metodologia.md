@@ -228,6 +228,22 @@ O sistema foi construído em incrementos, cada um verificado antes do seguinte (
 - Orquestração dos cinco serviços com Docker Compose.
 - Documentação técnica em `docs/`.
 
+### 8.8 Incremento 8: modelo de diagnóstico
+
+Com a introdução do TCC reorganizada, o artefato deixou de ser apenas o sistema de consulta e passou a ser o
+**modelo de diagnóstico**: framework de critérios, método de consultoria e protótipo RAG. O sistema foi
+expandido em oito passos, planejados em [12-plano-diagnostico.md](12-plano-diagnostico.md) e versionados um a um:
+
+1. coleções lógicas normativa e institucional na base de conhecimento (seção 3.6.1 a);
+2. framework de critérios versionado, com seed dos exemplos do Quadro 6 (seção 3.5);
+3. recuperação de evidências orientada por requisito (seção 3.6.1 b);
+4. verificação assistida com saída estruturada, regras determinísticas de EI, validação pelo consultor e
+   concordância (seções 3.6.1 c a e, 3.7 e 3.8, nível 2);
+5. priorização GUT e relatório (Quadro 9, etapas 6 e 7);
+6. telas do framework e da classificação de documentos (seção 3.5, passo c);
+7. avaliação da recuperação por requisito (seção 3.8, nível 1);
+8. exportação DOCX, devolutiva (etapa 8) e comparação entre modelos.
+
 **Resultado**: o artefato (sistema Mon) versionado no repositório Git.
 
 ---

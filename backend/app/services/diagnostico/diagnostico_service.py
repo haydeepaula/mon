@@ -33,6 +33,7 @@ from app.domain.knowledge_base import Colecao
 from app.repositories.framework_repository import SqlFrameworkRepository
 from app.services.diagnostico.prompt import carregar_instrucao
 from app.services.diagnostico.relatorio import gerar_relatorio
+from app.services.diagnostico.relatorio_docx import markdown_para_docx
 from app.services.job_service import JobService
 from app.services.settings_service import SettingsService
 
@@ -215,6 +216,9 @@ class DiagnosticoService:
     def _registrar_execucao(self, diagnostico: Diagnostico, n_itens: int) -> dict[str, Any]:
         """Registra modelo, parâmetros, prompt e base indexada (reprodutibilidade, seção 3.8)."""
         rag = SettingsService(self.session).get_rag()
+        # Diagnóstico clonado para comparar modelos: usa o LLM escolhido na clonagem.
+        llm = {"llm_provider": rag.llm_provider, "llm_model": rag.llm_model, "reasoning_level": rag.reasoning_level}
+        llm.update((diagnostico.config or {}).get("llm_override") or {})
         instrucao = carregar_instrucao(get_settings().diagnostico_prompt_file)
         documentos = self.session.scalars(
             select(Document).where(
@@ -226,9 +230,7 @@ class DiagnosticoService:
         execucao = {
             "executado_em": utcnow().isoformat(),
             "itens": n_itens,
-            "llm_provider": rag.llm_provider,
-            "llm_model": rag.llm_model,
-            "reasoning_level": rag.reasoning_level,
+            **llm,
             "retrieval_top_k": rag.retrieval_top_k,
             "rerank_enabled": rag.rerank_enabled,
             "rerank_model": rag.rerank_model if rag.rerank_enabled else None,
@@ -415,3 +417,93 @@ class DiagnosticoService:
         diagnostico.status = DiagnosticoStatus.RELATORIO_EMITIDO
         self.session.flush()
         return diagnostico
+
+    def relatorio_docx(self, diagnostico_id: uuid.UUID) -> bytes:
+        return markdown_para_docx(self.relatorio(diagnostico_id))
+
+    # --- etapa 8: devolutiva -----------------------------------------------------------------------
+    def registrar_devolutiva(self, diagnostico_id: uuid.UUID, dados: dict[str, Any], user_id: uuid.UUID | None) -> Diagnostico:
+        """Apresentação dos achados à coordenação e ao NDE.
+
+        ``aceito`` conclui o diagnóstico. ``revisado`` reabre a validação e a priorização: o
+        relatório emitido é arquivado no histórico e um novo deve ser emitido depois dos ajustes.
+        """
+        diagnostico = self.obter(diagnostico_id)
+        if diagnostico.status != DiagnosticoStatus.RELATORIO_EMITIDO:
+            raise ConflictError("A devolutiva é registrada depois da emissão do relatório.")
+        resultado = dados.get("resultado")
+        if resultado not in ("aceito", "revisado"):
+            raise ValidationError("Resultado da devolutiva deve ser aceito ou revisado.")
+        registro = {
+            "data": str(dados.get("data") or date.today().isoformat()),
+            "participantes": [str(p).strip() for p in dados.get("participantes") or [] if str(p).strip()],
+            "resultado": resultado,
+            "observacoes": (dados.get("observacoes") or "").strip() or None,
+            "relatorio_emitido_em": diagnostico.relatorio_emitido_em.isoformat() if diagnostico.relatorio_emitido_em else None,
+            "registrado_por": str(user_id) if user_id else None,
+            "registrado_em": utcnow().isoformat(),
+        }
+        devolutiva = dict(diagnostico.devolutiva or {})
+        devolutiva["registros"] = [*devolutiva.get("registros", []), registro]
+        devolutiva["ultima"] = registro
+        diagnostico.devolutiva = devolutiva
+        if resultado == "aceito":
+            diagnostico.status = DiagnosticoStatus.CONCLUIDO
+        else:
+            config = dict(diagnostico.config or {})
+            config["relatorios_anteriores"] = [
+                *config.get("relatorios_anteriores", []),
+                {"emitido_em": registro["relatorio_emitido_em"], "markdown": diagnostico.relatorio_md},
+            ]
+            diagnostico.config = config
+            diagnostico.relatorio_md = None
+            diagnostico.relatorio_emitido_em = None
+            diagnostico.status = DiagnosticoStatus.PRIORIZADO
+            self._atualizar_status_priorizacao(diagnostico)
+        self.session.flush()
+        return diagnostico
+
+    # --- comparação entre configurações (seção 3.8) ------------------------------------------------
+    def clonar(self, diagnostico_id: uuid.UUID, dados: dict[str, Any], user_id: uuid.UUID | None) -> Diagnostico:
+        """Novo diagnóstico com os mesmos requisitos e escopo, sem propostas nem validações.
+
+        Serve para repetir a verificação com outro modelo (ou outra configuração do RAG) e medir a
+        concordância das novas propostas com as decisões já registradas no diagnóstico de referência.
+        """
+        origem = self.obter(diagnostico_id)
+        override: dict[str, str] = {}
+        if dados.get("llm_provider") or dados.get("llm_model"):
+            from app.container import get_llm_factory
+
+            provider = dados.get("llm_provider") or (origem.config or {}).get("ultima_execucao", {}).get("llm_provider")
+            if provider not in get_llm_factory().providers():
+                raise ValidationError(f"Provedor desconhecido: {provider}.")
+            if not dados.get("llm_model"):
+                raise ValidationError("Informe o modelo.")
+            override = {"llm_provider": provider, "llm_model": str(dados["llm_model"]).strip()}
+            if dados.get("reasoning_level"):
+                override["reasoning_level"] = str(dados["reasoning_level"])
+        nome_modelo = override.get("llm_model", "configuração atual")
+        clone = Diagnostico(
+            nome=(dados.get("nome") or "").strip() or f"{origem.nome} — {nome_modelo}",
+            curso=origem.curso,
+            curso_nome=origem.curso_nome,
+            escopo=dict(origem.escopo or {}),
+            framework_versao=origem.framework_versao,
+            config={
+                "framework_status": (origem.config or {}).get("framework_status"),
+                "llm_override": override,
+                "clonado_de": str(origem.id),
+            },
+            status=DiagnosticoStatus.PLANEJAMENTO,
+            referencia_id=origem.id,
+            created_by=user_id,
+        )
+        for item in origem.itens:
+            clone.itens.append(
+                DiagnosticoItem(requisito_codigo=item.requisito_codigo, requisito=dict(item.requisito or {}), ordem=item.ordem)
+            )
+        self.session.add(clone)
+        self.session.flush()
+        return clone
+
