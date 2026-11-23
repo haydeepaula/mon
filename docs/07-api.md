@@ -71,6 +71,23 @@ exigem o papel de administrador.
 | GET / POST | `/evals/runs` | Lista / inicia execuções (`{name, case_ids}`) |
 | GET / DELETE | `/evals/runs/{id}` | Detalhes com resultados / exclui |
 
+## Framework de critérios (**admin**)
+
+Ver [13. Framework de critérios](13-framework-de-criterios.md). O parâmetro `versao` é opcional; sem ele, vale a versão ativa.
+
+| Método | Rota | Descrição |
+|---|---|---|
+| GET / POST | `/framework/versoes` | Lista versões (com totais de requisitos e aprovados) / cria versão vazia |
+| PATCH / DELETE | `/framework/versoes/{id}` | Altera status, ativa, descrição, notas, data de corte / exclui rascunho |
+| POST | `/framework/versoes/{id}/clonar` | Cria uma versão editável a partir de outra |
+| GET | `/framework/requisitos?versao=&tipo=&grupo=&dimensao=&formato=&status_validacao=&incluir_tendencia=&q=` | Lista requisitos filtrados |
+| POST | `/framework/requisitos?versao=` | Cria requisito |
+| GET / PUT / DELETE | `/framework/requisitos/{codigo}?versao=` | Consulta / altera parcialmente / exclui |
+| PATCH | `/framework/requisitos/{codigo}/validacao?versao=` | Revisão do orientador: `{status: pendente\|aprovado\|ajustar, comentario}` |
+| POST | `/framework/importar` | Importa JSON `{versao, modo: mesclar\|substituir, requisitos: [...]}` |
+| POST | `/framework/importar/csv` | Importa CSV (multipart: `file`, `versao`, `modo`) |
+| GET | `/framework/exportar?versao=&formato=json\|csv` | Exporta a versão (apêndice do TCC) |
+
 ## Saúde
 
 | Método | Rota | Descrição |

@@ -24,7 +24,7 @@ Princípio que guia todas as decisões: **o sistema propõe e o consultor decide
 | # | Entrega | Seção do TCC | Situação |
 |---|---|---|---|
 | 1 | Coleções lógicas `normativa` e `institucional`: filtros na busca vetorial, campos `colecao`, `tipo_documento` e `curso` nos documentos, organização por subpasta em `data/sources/`, reclassificação sem reindexar | 3.6.1 a | concluída |
-| 2 | Domínio e persistência do framework: `Requisito`, versões, seed do Quadro 6, importação e exportação JSON/CSV | 3.5, Quadro 6 | pendente |
+| 2 | Domínio e persistência do framework: `Requisito`, versões, seed do Quadro 6, importação e exportação JSON/CSV | 3.5, Quadro 6 | concluída |
 | 3 | Recuperação de evidências por requisito (só institucional, normativo opcional) | 3.6.1 b | pendente |
 | 4 | Diagnóstico: job de verificação com saída estruturada C/PC/NC/EI, regras de EI, validação do consultor, percentual de acordo e kappa de Cohen | 3.6.1 c/d/e; Quadro 9 etapas 4-5; 3.8 nível 2 | pendente |
 | 5 | Priorização GUT com sugestões de G e U; relatório em Markdown | Quadro 9 etapas 6-7 | pendente |

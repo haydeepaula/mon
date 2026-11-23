@@ -40,6 +40,8 @@ class Settings(BaseSettings):
     sources_dir: Path = Path("/data/sources")
     max_upload_mb: int = 100
     system_prompt_file: Path = Path("/app/SYSTEM_PROMPT.md")
+    # Framework de critérios carregado na primeira inicialização (TCC, seção 3.5).
+    framework_seed_file: Path = Path("/data/framework/framework-v0.1.json")
 
     ocr_languages: str = "por+eng"
     ocr_dpi: int = 300

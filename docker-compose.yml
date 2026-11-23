@@ -20,10 +20,12 @@ x-backend-env: &backend-env
   UPLOAD_DIR: /data/uploads
   SOURCES_DIR: /data/sources
   SYSTEM_PROMPT_FILE: /app/SYSTEM_PROMPT.md
+  FRAMEWORK_SEED_FILE: /data/framework/framework-v0.1.json
 
 x-backend-volumes: &backend-volumes
   - uploads:/data/uploads
   - ./data/sources:/data/sources:ro
+  - ./data/framework:/data/framework:ro
   - ./SYSTEM_PROMPT.md:/app/SYSTEM_PROMPT.md:ro
 
 services:

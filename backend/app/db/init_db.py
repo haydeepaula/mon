@@ -39,7 +39,9 @@ def wait_for_database(timeout: int = 60) -> None:
 
 def init_database() -> None:
     """Cria tabelas e dados iniciais. O advisory lock evita corrida entre API e worker."""
+    from app.core.config import get_settings
     from app.services.auth_service import AuthService
+    from app.services.framework.framework_service import FrameworkService
     from app.services.settings_service import SettingsService
 
     wait_for_database()
@@ -51,6 +53,7 @@ def init_database() -> None:
         with Session(bind=connection) as session:
             AuthService(session).ensure_admin()
             SettingsService(session).ensure_defaults()
+            FrameworkService(session).carregar_seed(get_settings().framework_seed_file)
             session.flush()
 
 

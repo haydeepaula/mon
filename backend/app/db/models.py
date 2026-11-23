@@ -1,8 +1,20 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from enum import StrEnum
 
-from sqlalchemy import BigInteger, Boolean, DateTime, Float, ForeignKey, Integer, String, Text, Uuid
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    Date,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    Uuid,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, JsonType
@@ -206,3 +218,61 @@ class EvalResult(Base):
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     run: Mapped[EvalRun] = relationship(back_populates="results")
+
+
+class FrameworkVersao(TimestampMixin, Base):
+    """Versão do framework de critérios. Versões validadas ou arquivadas são imutáveis."""
+
+    __tablename__ = "framework_versoes"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    versao: Mapped[str] = mapped_column(String(40), unique=True, index=True)
+    descricao: Mapped[str] = mapped_column(Text, default="")
+    data_corte: Mapped[date | None] = mapped_column(Date, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="rascunho")
+    ativa: Mapped[bool] = mapped_column(Boolean, default=False)
+    notas: Mapped[str | None] = mapped_column(Text, nullable=True)
+    validado_por: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    validado_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    requisitos: Mapped[list["RequisitoModel"]] = relationship(
+        back_populates="framework",
+        cascade="all, delete-orphan",
+        order_by=lambda: [RequisitoModel.ordem, RequisitoModel.codigo],
+    )
+
+
+class RequisitoModel(TimestampMixin, Base):
+    """Requisito do framework (TCC, seção 3.5 e Quadro 6). Campos descritos em domain/framework.py."""
+
+    __tablename__ = "requisitos"
+    __table_args__ = (UniqueConstraint("framework_id", "codigo", name="uq_requisito_versao_codigo"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    framework_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("framework_versoes.id", ondelete="CASCADE"), index=True
+    )
+    codigo: Mapped[str] = mapped_column(String(40), index=True)
+    grupo: Mapped[str] = mapped_column(String(20), index=True)
+    fonte_documento: Mapped[str] = mapped_column(String(300))
+    fonte_dispositivo: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    texto: Mapped[str] = mapped_column(Text)
+    tipo: Mapped[str] = mapped_column(String(20), index=True)
+    dimensao_inep: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    indicador_inep: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    evidencia_esperada: Mapped[str] = mapped_column(Text)
+    documentos_provaveis: Mapped[list] = mapped_column(JsonType, default=list)
+    consulta_padrao: Mapped[str | None] = mapped_column(Text, nullable=True)
+    termos_chave: Mapped[list] = mapped_column(JsonType, default=list)
+    gravidade_base: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    peso_dimensao: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    aplicabilidade: Mapped[dict] = mapped_column(JsonType, default=dict)
+    situacao_normativa: Mapped[str] = mapped_column(String(20), default="vigente")
+    prazo_referencia: Mapped[date | None] = mapped_column(Date, nullable=True)
+    status_validacao: Mapped[str] = mapped_column(String(20), default="pendente", index=True)
+    comentario_validacao: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ordem: Mapped[int] = mapped_column(Integer, default=0)
+
+    framework: Mapped[FrameworkVersao] = relationship(back_populates="requisitos")

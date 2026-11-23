@@ -19,6 +19,7 @@ from app.domain.entities import (
     RetrievedChunk,
     VectorPoint,
 )
+from app.domain.framework import FiltroRequisitos, Requisito, VersaoInfo
 
 
 class EmbeddingProvider(ABC):
@@ -88,6 +89,21 @@ class VectorStore(ABC):
 
     @abstractmethod
     def is_healthy(self) -> bool: ...
+
+
+class FrameworkRepository(ABC):
+    """Acesso de leitura ao framework de critérios (TCC, seção 3.5)."""
+
+    @abstractmethod
+    def versao_ativa(self) -> VersaoInfo | None: ...
+
+    @abstractmethod
+    def listar(self, filtros: FiltroRequisitos | None = None) -> list[Requisito]:
+        """Requisitos da versão indicada em ``filtros.versao`` (ou da ativa), já filtrados."""
+
+    @abstractmethod
+    def obter(self, codigo: str, versao: str | None = None) -> Requisito:
+        """Lança NotFoundError se o requisito não existir na versão."""
 
 
 class OcrEngine(ABC):

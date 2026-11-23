@@ -175,6 +175,8 @@ erDiagram
     }
 ```
 
+As tabelas do framework de critérios e do diagnóstico estão descritas em [13. Framework de critérios](13-framework-de-criterios.md) e [14. Diagnóstico](14-diagnostico.md).
+
 ## 2.5 Modelo de dados vetorial (Qdrant)
 
 Coleção `mon_documents`: vetores de **3072 dimensões**, distância **cosseno**. Cada ponto (chunk) carrega:
@@ -189,5 +191,7 @@ Coleção `mon_documents`: vetores de **3072 dimensões**, distância **cosseno*
 | `page`, `sheet`, `heading` | Localização (página/slide, aba, seção) | — |
 | `ocr` | Se o texto veio de OCR | — |
 | `source`, `sha256`, `indexed_at` | Origem, hash do arquivo e data de indexação | — |
+| `colecao` | Coleção lógica: `normativa` ou `institucional` (seção 4.9) | sim (keyword) |
+| `tipo_documento`, `curso` | Tipo do documento e curso a que pertence | sim (keyword) |
 
 O ID de cada ponto é um UUID v5 determinístico de `documento:versão:chunk`.
