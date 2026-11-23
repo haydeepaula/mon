@@ -165,8 +165,12 @@ export class AdminApi {
     return firstValueFrom(this.http.get<EvalRunDetail>(`/api/evals/runs/${id}`));
   }
 
-  startEvalRun(name?: string, case_ids?: string[]) {
-    return firstValueFrom(this.http.post<EvalRun>('/api/evals/runs', { name, case_ids }));
+  startEvalRun(name?: string, case_ids?: string[], modo: 'chat' | 'requisito' = 'chat', curso?: string | null) {
+    return firstValueFrom(this.http.post<EvalRun>('/api/evals/runs', { name, case_ids, modo, curso: curso || null }));
+  }
+
+  evalCasesFromFramework(tipos: string[] = []) {
+    return firstValueFrom(this.http.post<{ created: number }>('/api/evals/cases/from-framework', { tipos }));
   }
 
   deleteEvalRun(id: string) {

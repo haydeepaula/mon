@@ -6,6 +6,7 @@ from app.api.deps import AdminUser, DbSession
 from app.api.schemas.evals import (
     EvalCaseIn,
     EvalCaseOut,
+    EvalFromFramework,
     EvalGenerateRequest,
     EvalImportRequest,
     EvalRunCreate,
@@ -25,22 +26,37 @@ def list_cases(_: AdminUser, db: DbSession):
 
 @router.post("/cases", response_model=EvalCaseOut, status_code=status.HTTP_201_CREATED)
 def create_case(body: EvalCaseIn, _: AdminUser, db: DbSession):
-    return EvalService(db).create_case(body.model_dump())
+    case = EvalService(db).create_case(body.model_dump())
+    db.commit()
+    return case
 
 
 @router.put("/cases/{case_id}", response_model=EvalCaseOut)
 def update_case(case_id: uuid.UUID, body: EvalCaseIn, _: AdminUser, db: DbSession):
-    return EvalService(db).update_case(case_id, body.model_dump())
+    case = EvalService(db).update_case(case_id, body.model_dump())
+    db.commit()
+    return case
 
 
 @router.delete("/cases/{case_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_case(case_id: uuid.UUID, _: AdminUser, db: DbSession):
     EvalService(db).delete_case(case_id)
+    db.commit()
 
 
 @router.post("/cases/import", response_model=dict[str, int])
 def import_cases(body: EvalImportRequest, _: AdminUser, db: DbSession):
-    return {"imported": EvalService(db).import_cases([case.model_dump() for case in body.cases])}
+    imported = EvalService(db).import_cases([case.model_dump() for case in body.cases])
+    db.commit()
+    return {"imported": imported}
+
+
+@router.post("/cases/from-framework", response_model=dict[str, int])
+def cases_from_framework(body: EvalFromFramework, _: AdminUser, db: DbSession):
+    """Cria um caso por requisito do framework (consulta padronizada como pergunta)."""
+    created = EvalService(db).cases_from_framework(body.versao, body.tipos)
+    db.commit()
+    return {"created": created}
 
 
 @router.post("/cases/generate", response_model=JobOut)
@@ -55,7 +71,9 @@ def list_runs(_: AdminUser, db: DbSession):
 
 @router.post("/runs", response_model=EvalRunOut, status_code=status.HTTP_201_CREATED)
 def start_run(body: EvalRunCreate, user: AdminUser, db: DbSession):
-    return EvalService(db).start_run(body.name, body.case_ids, user.id)
+    run = EvalService(db).start_run(body.name, body.case_ids, user.id, body.modo, body.curso)
+    db.commit()  # o job e a execução precisam existir antes de o cliente consultar
+    return run
 
 
 @router.get("/runs/{run_id}", response_model=EvalRunDetailOut)
@@ -66,3 +84,4 @@ def get_run(run_id: uuid.UUID, _: AdminUser, db: DbSession):
 @router.delete("/runs/{run_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_run(run_id: uuid.UUID, _: AdminUser, db: DbSession):
     EvalService(db).delete_run(run_id)
+    db.commit()

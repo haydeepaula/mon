@@ -82,7 +82,7 @@ Cada execução da verificação registra em `diagnosticos.config.execucoes`: da
 
 ## 14.8 Concordância
 
-Ver [6.7](06-avaliacao.md#67-concordância-diagnóstica-nível-2-da-seção-38-do-tcc). A aba "Concordância" mostra percentual de acordo, κ de Cohen com interpretação, κ ponderado do conceito INEP, matriz de confusão, divergências por causa e acordo por tipo de requisito.
+Ver [6.8](06-avaliacao.md#68-concordância-diagnóstica-nível-2-da-seção-38-do-tcc). A aba "Concordância" mostra percentual de acordo, κ de Cohen com interpretação, κ ponderado do conceito INEP, matriz de confusão, divergências por causa e acordo por tipo de requisito.
 
 ## 14.9 Arquitetura
 

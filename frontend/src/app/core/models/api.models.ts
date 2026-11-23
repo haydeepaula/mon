@@ -188,10 +188,19 @@ export interface EvalCase {
   expected_answer: string | null;
   expected_documents: string[];
   tags: string[];
+  requisito_codigo: string | null;
   created_at: string;
 }
 
-export type EvalCaseInput = Omit<EvalCase, 'id' | 'created_at'>;
+export type EvalCaseInput = Omit<EvalCase, 'id' | 'created_at' | 'requisito_codigo'> & { requisito_codigo?: string | null };
+
+export interface EvalRetrievalGroup {
+  n: number;
+  hit_rate: number | null;
+  mrr: number | null;
+  recall: number | null;
+  context_precision: number | null;
+}
 
 export interface EvalMetrics {
   cases?: number;
@@ -205,6 +214,9 @@ export interface EvalMetrics {
   correctness?: number | null;
   latency_ms_avg?: number | null;
   latency_ms_p95?: number | null;
+  por_tipo?: Record<string, EvalRetrievalGroup>;
+  requisito?: string;
+  tipo?: string;
 }
 
 export interface EvalRun {

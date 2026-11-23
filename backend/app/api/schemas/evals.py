@@ -1,6 +1,8 @@
 import uuid
 from datetime import datetime
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 from app.api.schemas.common import ORMModel
@@ -11,6 +13,7 @@ class EvalCaseIn(BaseModel):
     expected_answer: str | None = Field(None, max_length=8000)
     expected_documents: list[str] = []
     tags: list[str] = []
+    requisito_codigo: str | None = Field(None, max_length=40)
 
 
 class EvalCaseOut(ORMModel):
@@ -19,6 +22,7 @@ class EvalCaseOut(ORMModel):
     expected_answer: str | None
     expected_documents: list[str]
     tags: list[str]
+    requisito_codigo: str | None = None
     created_at: datetime
 
 
@@ -33,6 +37,15 @@ class EvalGenerateRequest(BaseModel):
 class EvalRunCreate(BaseModel):
     name: str | None = Field(None, max_length=160)
     case_ids: list[uuid.UUID] | None = None
+    # chat: pergunta → resposta do Mon (recuperação + geração + juiz).
+    # requisito: recuperação de evidências por requisito do framework (sem geração).
+    modo: Literal["chat", "requisito"] = "chat"
+    curso: str | None = Field(None, max_length=80)
+
+
+class EvalFromFramework(BaseModel):
+    versao: str | None = Field(None, max_length=40)
+    tipos: list[Literal["legal", "qualidade", "competencia"]] = []
 
 
 class EvalResultOut(ORMModel):

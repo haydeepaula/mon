@@ -2,6 +2,11 @@
 
 Métricas de recuperação (exigem documentos esperados): hit rate, MRR, recall e precisão de contexto.
 Métricas de geração (LLM como juiz, inspiradas no RAGAS): fidelidade, relevância e correção.
+
+Dois modos de execução:
+- ``chat``: cada caso é uma pergunta respondida pelo Mon (recuperação, geração e juiz);
+- ``requisito``: cada caso aponta para um requisito do framework e mede só a recuperação de
+  evidências orientada por requisito (TCC, seção 3.8, nível 1), por requisito e por tipo.
 """
 
 import logging
@@ -85,12 +90,27 @@ def retrieval_metrics(expected: list[str], retrieved: list[str]) -> dict:
     }
 
 
+def _media(results: list[EvalResult], key: str) -> float | None:
+    values = [r.metrics[key] for r in results if isinstance(r.metrics.get(key), (int, float))]
+    return round(statistics.mean(values), 4) if values else None
+
+
 def aggregate(results: list[EvalResult]) -> dict:
     valid = [r for r in results if not r.error]
     summary: dict = {"cases": len(results), "errors": len(results) - len(valid)}
     for key in _METRIC_KEYS:
-        values = [r.metrics[key] for r in valid if isinstance(r.metrics.get(key), (int, float))]
-        summary[key] = round(statistics.mean(values), 4) if values else None
+        summary[key] = _media(valid, key)
+    # Avaliação por requisito: médias de recuperação por tipo de requisito.
+    tipos = sorted({r.metrics.get("tipo") for r in valid if isinstance(r.metrics.get("tipo"), str)})
+    if tipos:
+        summary["por_tipo"] = {
+            tipo: {
+                "n": len(grupo),
+                **{k: _media(grupo, k) for k in ("hit_rate", "mrr", "recall", "context_precision")},
+            }
+            for tipo in tipos
+            for grupo in [[r for r in valid if r.metrics.get("tipo") == tipo]]
+        }
     latencies = [r.latency_ms for r in valid]
     summary["latency_ms_avg"] = int(statistics.mean(latencies)) if latencies else None
     summary["latency_ms_p95"] = int(sorted(latencies)[int(0.95 * (len(latencies) - 1))]) if latencies else None
@@ -132,6 +152,30 @@ class EvalService:
             self.cases.add(EvalCase(**item))
         return len(items)
 
+    def cases_from_framework(self, versao: str | None = None, tipos: list[str] | None = None) -> int:
+        """Um caso por requisito ainda sem caso. Os documentos esperados ficam vazios e devem ser
+        preenchidos pelo consultor; sem eles, hit rate e MRR não são calculados."""
+        from app.domain.framework import FiltroRequisitos
+        from app.repositories.framework_repository import SqlFrameworkRepository
+
+        existentes = {c.requisito_codigo for c in self.cases.list_ordered() if c.requisito_codigo}
+        requisitos = SqlFrameworkRepository(self.session).listar(FiltroRequisitos(versao=versao, tipos=list(tipos or [])))
+        criados = 0
+        for requisito in requisitos:
+            if requisito.codigo in existentes:
+                continue
+            self.cases.add(
+                EvalCase(
+                    question=requisito.consulta(),
+                    expected_answer=requisito.evidencia_esperada,
+                    expected_documents=[],
+                    tags=["framework", requisito.tipo, requisito.grupo],
+                    requisito_codigo=requisito.codigo,
+                )
+            )
+            criados += 1
+        return criados
+
     def enqueue_generation(self, count: int, user_id: uuid.UUID | None):
         return self.jobs.enqueue(JobType.EVAL_GENERATE, {"count": count}, user_id, message="Gerando casos sintéticos")
 
@@ -145,8 +189,19 @@ class EvalService:
     def delete_run(self, run_id: uuid.UUID) -> None:
         self.runs.delete(self.get_run(run_id))
 
-    def start_run(self, name: str | None, case_ids: list[uuid.UUID] | None, user_id: uuid.UUID | None) -> EvalRun:
+    def start_run(
+        self,
+        name: str | None,
+        case_ids: list[uuid.UUID] | None,
+        user_id: uuid.UUID | None,
+        modo: str = "chat",
+        curso: str | None = None,
+    ) -> EvalRun:
         cases = self.cases.get_many(case_ids) if case_ids else self.cases.list_ordered()
+        if modo == "requisito":
+            cases = [c for c in cases if c.requisito_codigo]
+            if not cases:
+                raise ValidationError("Nenhum caso vinculado a requisito. Gere os casos a partir do framework.")
         if not cases:
             raise ValidationError("Cadastre ao menos um caso de teste antes de executar a avaliação.")
         rag = SettingsService(self.session).get_rag()
@@ -156,6 +211,8 @@ class EvalService:
                 case_count=len(cases),
                 config={
                     "case_ids": [str(c.id) for c in cases],
+                    "modo": modo,
+                    "curso": (curso or "").strip() or None,
                     "llm_provider": rag.llm_provider,
                     "llm_model": rag.llm_model,
                     "reasoning_level": rag.reasoning_level,
@@ -178,12 +235,23 @@ class EvalService:
         run.status = JobStatus.RUNNING
         run.results.clear()  # reexecução começa do zero
         self.session.commit()
-        rag = RagService.from_settings(SettingsService(self.session).get_rag())
+        settings = SettingsService(self.session).get_rag()
+        por_requisito = run.config.get("modo") == "requisito"
+        if por_requisito:
+            from app.services.framework.evidence_retrieval_service import EvidenceRetrievalService
+
+            retrieval = EvidenceRetrievalService.from_settings(self.session, settings)
+        else:
+            rag = RagService.from_settings(settings)
         cases = self.cases.get_many([uuid.UUID(i) for i in run.config.get("case_ids", [])])
         try:
             for position, case in enumerate(cases, start=1):
                 reporter.report((position - 1) / len(cases), f"Caso {position}/{len(cases)}")
-                run.results.append(self._evaluate_case(rag, case, position))
+                if por_requisito:
+                    result = self._evaluate_requirement(retrieval, case, position, run.config.get("curso"))
+                else:
+                    result = self._evaluate_case(rag, case, position)
+                run.results.append(result)
                 self.session.commit()
             run.metrics = aggregate(run.results)
             run.status = JobStatus.SUCCEEDED
@@ -221,6 +289,39 @@ class EvalService:
         except Exception as exc:
             logger.exception("Falha no caso de avaliação %s.", case.id)
             result.error = str(exc)[:2000]
+        return result
+
+    @staticmethod
+    def _evaluate_requirement(retrieval, case: EvalCase, position: int, curso: str | None) -> EvalResult:
+        """Avaliação por requisito: só a recuperação de evidências, sem geração nem juiz."""
+        import time
+
+        result = EvalResult(
+            case_id=case.id,
+            position=position,
+            question=f"{case.requisito_codigo}: {case.question}",
+            expected_answer=case.expected_answer,
+            expected_documents=list(case.expected_documents or []),
+        )
+        started = time.perf_counter()
+        try:
+            recuperacao = retrieval.recuperar_detalhado(case.requisito_codigo, curso)
+            result.latency_ms = int((time.perf_counter() - started) * 1000)
+            arquivos = [e.documento for e in recuperacao.evidencias]
+            result.retrieved = [
+                {"index": i, "filename": e.documento, "page": e.pagina, "sheet": None, "rerank_score": e.rerank_score,
+                 "vector_score": e.vector_score, "cited": False}
+                for i, e in enumerate(recuperacao.evidencias, start=1)
+            ]
+            result.answer = "\n".join(f"[{i}] {e.localizacao or e.documento}" for i, e in enumerate(recuperacao.evidencias, start=1))
+            metrics = retrieval_metrics(result.expected_documents, arquivos)
+            metrics.update({"requisito": case.requisito_codigo, "tipo": recuperacao.requisito.tipo})
+            result.metrics = metrics
+            if not result.expected_documents:
+                result.judge_reason = "Sem documentos esperados: preencha-os no caso para calcular hit rate e MRR."
+        except Exception as exc:
+            logger.exception("Falha no caso por requisito %s.", case.requisito_codigo)
+            result.error = (getattr(exc, "message", None) or str(exc))[:2000]
         return result
 
     @staticmethod

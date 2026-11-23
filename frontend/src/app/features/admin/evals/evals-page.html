@@ -11,6 +11,7 @@
         </p>
       </div>
       <div class="actions">
+        <button class="btn" (click)="fromFramework()"><app-icon name="layers" [size]="16" /> Casos do framework</button>
         <button class="btn" (click)="generateDialog.set(true)"><app-icon name="sparkles" [size]="16" /> Gerar casos sintéticos</button>
         <button class="btn primary" (click)="runDialog.set(true)" [disabled]="!cases().length">
           <app-icon name="play" [size]="15" /> Executar avaliação
@@ -38,7 +39,11 @@
           </div>
 
           <div class="config">
-            <span class="chip">LLM: {{ current.config.llm_model }}</span>
+            @if (current.config['modo'] === 'requisito') {
+              <span class="chip expected">por requisito{{ current.config['curso'] ? ' · ' + current.config['curso'] : '' }}</span>
+            } @else {
+              <span class="chip">LLM: {{ current.config.llm_model }}</span>
+            }
             <span class="chip">rerank: {{ current.config['rerank_enabled'] ? current.config.rerank_model : 'desligado' }}</span>
             <span class="chip">top-k {{ current.config['retrieval_top_k'] }} → top-n {{ current.config['rerank_top_n'] }}</span>
             <span class="chip">chunk {{ current.config['chunk_size'] }}/{{ current.config['chunk_overlap'] }}</span>
@@ -85,6 +90,43 @@
               </div>
             </div>
           </div>
+
+          @if (tiposDe(current.metrics).length) {
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <h3>Recuperação por tipo de requisito</h3>
+                  <p>Médias por tipo (seção 3.8, nível 1). Casos sem documentos esperados não entram nas médias.</p>
+                </div>
+              </div>
+              <div class="table-wrap">
+                <table class="table">
+                  <thead>
+                    <tr>
+                      <th>Tipo</th>
+                      <th class="num">Casos</th>
+                      <th class="num">Hit rate</th>
+                      <th class="num">MRR</th>
+                      <th class="num">Recall</th>
+                      <th class="num">Precisão do contexto</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (par of tiposDe(current.metrics); track par[0]) {
+                      <tr>
+                        <td>{{ tipoLabels[par[0]] || par[0] }}</td>
+                        <td class="num">{{ par[1].n }}</td>
+                        <td class="num"><span class="score" [class]="tone(par[1].hit_rate)">{{ par[1].hit_rate | percent100: 1 }}</span></td>
+                        <td class="num"><span class="score" [class]="tone(par[1].mrr)">{{ par[1].mrr | percent100: 1 }}</span></td>
+                        <td class="num">{{ par[1].recall | percent100: 1 }}</td>
+                        <td class="num">{{ par[1].context_precision | percent100: 1 }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          }
 
           <div class="card">
             <div class="card-header">
@@ -278,6 +320,9 @@
                   <td class="check"><input type="checkbox" [checked]="selectedCases().has(item.id)" (change)="toggleCase(item.id)" /></td>
                   <td class="question">
                     {{ item.question }}
+                    @if (item.requisito_codigo) {
+                      <span class="badge info">{{ item.requisito_codigo }}</span>
+                    }
                     @if (item.expected_answer) {
                       <div class="muted small truncate expected-answer">↳ {{ item.expected_answer }}</div>
                     }
@@ -330,6 +375,11 @@
         <h3>{{ form.id ? 'Editar caso de teste' : 'Novo caso de teste' }}</h3>
       </div>
       <div class="modal-body">
+        <div class="field">
+          <label>Requisito do framework (opcional)</label>
+          <input class="input mono" name="requisito" [(ngModel)]="form.requisito_codigo" placeholder="EXT-01" />
+          <span class="hint">Casos vinculados a requisito entram na avaliação por requisito (recuperação de evidências).</span>
+        </div>
         <div class="field">
           <label>Pergunta</label>
           <textarea class="textarea" name="question" rows="2" [(ngModel)]="form.question" required></textarea>
@@ -385,6 +435,20 @@
           <label>Nome da execução (opcional)</label>
           <input class="input" name="runName" [(ngModel)]="runName" placeholder="Ex.: rerank v4 pro, chunk 1200" />
         </div>
+        <div class="field">
+          <label>Modo</label>
+          <select class="select" name="runModo" [(ngModel)]="runModo">
+            <option value="chat">Chat: recuperação, resposta e LLM juiz</option>
+            <option value="requisito">Por requisito: recuperação de evidências do framework (sem geração)</option>
+          </select>
+        </div>
+        @if (runModo === 'requisito') {
+          <div class="field">
+            <label>Curso</label>
+            <input class="input" name="runCurso" [(ngModel)]="runCurso" />
+            <span class="hint">Só documentos institucionais desse curso são considerados. Apenas casos vinculados a requisito são executados.</span>
+          </div>
+        }
       </div>
       <div class="modal-footer">
         <button type="button" class="btn" (click)="runDialog.set(false)">Cancelar</button>

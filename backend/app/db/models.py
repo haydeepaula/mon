@@ -179,6 +179,8 @@ class EvalCase(TimestampMixin, Base):
     expected_answer: Mapped[str | None] = mapped_column(Text, nullable=True)
     expected_documents: Mapped[list] = mapped_column(JsonType, default=list)
     tags: Mapped[list] = mapped_column(JsonType, default=list)
+    # Requisito do framework avaliado por este caso (avaliação por requisito, TCC seção 3.8).
+    requisito_codigo: Mapped[str | None] = mapped_column(String(40), nullable=True, index=True)
 
 
 class EvalRun(Base):

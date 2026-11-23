@@ -20,6 +20,8 @@ _SCHEMA_UPGRADES = (
     "CREATE INDEX IF NOT EXISTS ix_documents_colecao ON documents (colecao)",
     "CREATE INDEX IF NOT EXISTS ix_documents_tipo_documento ON documents (tipo_documento)",
     "CREATE INDEX IF NOT EXISTS ix_documents_curso ON documents (curso)",
+    "ALTER TABLE eval_cases ADD COLUMN IF NOT EXISTS requisito_codigo VARCHAR(40)",
+    "CREATE INDEX IF NOT EXISTS ix_eval_cases_requisito_codigo ON eval_cases (requisito_codigo)",
 )
 
 

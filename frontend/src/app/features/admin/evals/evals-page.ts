@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
-import { EvalCase, EvalCaseInput, EvalMetrics, EvalResult, EvalRun, EvalRunDetail } from '../../../core/models/api.models';
+import { EvalCase, EvalCaseInput, EvalMetrics, EvalResult, EvalRetrievalGroup, EvalRun, EvalRunDetail } from '../../../core/models/api.models';
 import { AdminApi } from '../../../core/services/admin-api.service';
 import { apiErrorMessage } from '../../../core/services/api-error';
 import { ConfirmService } from '../../../core/services/confirm.service';
@@ -23,6 +23,7 @@ export const METRICS: { key: keyof EvalMetrics; label: string; hint: string; gro
 
 interface CaseForm {
   id: string | null;
+  requisito_codigo: string;
   question: string;
   expected_answer: string;
   expected_documents: string[];
@@ -54,6 +55,9 @@ export class EvalsPage implements OnInit {
   protected readonly runDialog = signal(false);
   protected readonly generateDialog = signal(false);
   protected runName = '';
+  protected runModo: 'chat' | 'requisito' = 'chat';
+  protected runCurso = 'eng-producao-ead';
+  protected readonly tipoLabels: Record<string, string> = { legal: 'Legal', qualidade: 'Qualidade (INEP)', competencia: 'Competência I4.0' };
   protected generateCount = 10;
   protected docToAdd = '';
 
@@ -106,7 +110,12 @@ export class EvalsPage implements OnInit {
   protected async startRun(): Promise<void> {
     const selected = [...this.selectedCases()];
     try {
-      const run = await this.api.startEvalRun(this.runName.trim() || undefined, selected.length ? selected : undefined);
+      const run = await this.api.startEvalRun(
+        this.runName.trim() || undefined,
+        selected.length ? selected : undefined,
+        this.runModo,
+        this.runModo === 'requisito' ? this.runCurso.trim() : null,
+      );
       this.runDialog.set(false);
       this.runName = '';
       this.tab.set('runs');
@@ -152,12 +161,13 @@ export class EvalsPage implements OnInit {
 
   // Casos de teste
   protected newCase(): void {
-    this.caseForm.set({ id: null, question: '', expected_answer: '', expected_documents: [], tags: '' });
+    this.caseForm.set({ id: null, requisito_codigo: '', question: '', expected_answer: '', expected_documents: [], tags: '' });
   }
 
   protected editCase(item: EvalCase): void {
     this.caseForm.set({
       id: item.id,
+      requisito_codigo: item.requisito_codigo ?? '',
       question: item.question,
       expected_answer: item.expected_answer ?? '',
       expected_documents: [...item.expected_documents],
@@ -181,6 +191,7 @@ export class EvalsPage implements OnInit {
       expected_answer: form.expected_answer.trim() || null,
       expected_documents: form.expected_documents,
       tags: form.tags.split(',').map((tag) => tag.trim()).filter(Boolean),
+      requisito_codigo: form.requisito_codigo.trim().toUpperCase() || null,
     };
     if (payload.question.length < 3) {
       this.toast.error('Informe a pergunta.');
@@ -230,6 +241,25 @@ export class EvalsPage implements OnInit {
     this.selectedCases.set(this.selectedCases().size === all.length ? new Set() : new Set(all));
   }
 
+  protected async fromFramework(): Promise<void> {
+    try {
+      const { created } = await this.api.evalCasesFromFramework();
+      this.toast.success(
+        created
+          ? `${created} caso(s) criados a partir do framework. Preencha os documentos esperados de cada um.`
+          : 'Todos os requisitos do framework ativo já têm caso de teste.',
+      );
+      this.tab.set('cases');
+      this.refreshCases();
+    } catch (error) {
+      this.toast.error(apiErrorMessage(error));
+    }
+  }
+
+  protected tiposDe(metrics: EvalMetrics): [string, EvalRetrievalGroup][] {
+    return Object.entries(metrics.por_tipo ?? {});
+  }
+
   protected async generate(): Promise<void> {
     try {
       await this.api.generateEvalCases(this.generateCount);
@@ -252,6 +282,7 @@ export class EvalsPage implements OnInit {
         expected_answer: item.expected_answer ?? null,
         expected_documents: item.expected_documents ?? [],
         tags: item.tags ?? [],
+        requisito_codigo: item.requisito_codigo ?? null,
       }));
       const result = await this.api.importEvalCases(items);
       this.toast.success(`${result.imported} casos importados.`);
@@ -262,11 +293,12 @@ export class EvalsPage implements OnInit {
   }
 
   protected exportCases(): void {
-    const data = this.cases().map(({ question, expected_answer, expected_documents, tags }) => ({
+    const data = this.cases().map(({ question, expected_answer, expected_documents, tags, requisito_codigo }) => ({
       question,
       expected_answer,
       expected_documents,
       tags,
+      requisito_codigo,
     }));
     const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
     const anchor = document.createElement('a');

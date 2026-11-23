@@ -29,7 +29,7 @@ Princípio que guia todas as decisões: **o sistema propõe e o consultor decide
 | 4 | Diagnóstico: job de verificação com saída estruturada C/PC/NC/EI, regras de EI, validação do consultor, percentual de acordo e kappa de Cohen | 3.6.1 c/d/e; Quadro 9 etapas 4-5; 3.8 nível 2 | concluída |
 | 5 | Priorização GUT com sugestões de G e U; relatório em Markdown | Quadro 9 etapas 6-7 | concluída |
 | 6 | Tela do framework: edição e aprovação pelo orientador | 3.5 c | concluída |
-| 7 | Avaliação por requisito: hit rate e MRR por requisito e por tipo | 3.8 nível 1 | pendente |
+| 7 | Avaliação por requisito: hit rate e MRR por requisito e por tipo | 3.8 nível 1 | concluída |
 | 8 | DOCX, devolutiva, validação cega, comparação entre modelos | Quadro 9 etapa 8; ablação | pendente |
 
 Os passos 1 a 4 formam o núcleo para o Projeto Final II: diagnóstico preliminar e medida de concordância.

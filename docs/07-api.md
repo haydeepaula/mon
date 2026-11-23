@@ -67,8 +67,9 @@ exigem o papel de administrador.
 | GET / POST | `/evals/cases` | Lista / cria casos de teste |
 | PUT / DELETE | `/evals/cases/{id}` | Edita / exclui caso |
 | POST | `/evals/cases/import` | Importa casos em lote |
+| POST | `/evals/cases/from-framework` | Cria um caso por requisito do framework (`{versao?, tipos?}`) |
 | POST | `/evals/cases/generate` | Agenda geração de casos sintéticos (`{count}`) |
-| GET / POST | `/evals/runs` | Lista / inicia execuções (`{name, case_ids}`) |
+| GET / POST | `/evals/runs` | Lista / inicia execuções (`{name, case_ids, modo: chat\|requisito, curso}`) |
 | GET / DELETE | `/evals/runs/{id}` | Detalhes com resultados / exclui |
 
 ## Framework de critérios (**admin**)

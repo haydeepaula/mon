@@ -83,7 +83,18 @@ Também são registradas a **latência média** e o **percentil 95** da latênci
 3. Variar um fator por vez — rerank ligado/desligado, top-n, tamanho de chunk (reindexando), modelo — e comparar.
 4. Reportar as métricas médias, a latência e exemplos qualitativos (acertos e falhas).
 
-## 6.7 Concordância diagnóstica (nível 2 da seção 3.8 do TCC)
+## 6.7 Avaliação por requisito (nível 1 da seção 3.8 do TCC)
+
+Além do modo **chat** (pergunta → resposta do Mon → juiz), a execução pode ser feita no modo **requisito**, que mede apenas a recuperação de evidências orientada por requisito usada no diagnóstico ([13.5](13-framework-de-criterios.md#135-recuperação-de-evidências-por-requisito)):
+
+- cada caso tem um `requisito_codigo`; `POST /api/evals/cases/from-framework` cria um caso por requisito do framework ativo, com a consulta padronizada como pergunta e a evidência esperada como referência;
+- os **documentos esperados** de cada caso são preenchidos pelos autores e pelo orientador (o caso de referência validado da seção 3.8); sem eles, hit rate e MRR não são calculados para o caso;
+- a execução recebe o **curso**, e só documentos institucionais desse curso são considerados;
+- não há geração nem juiz; são calculados hit rate, MRR, recall e precisão de contexto, com médias gerais e **por tipo de requisito** (`metrics.por_tipo`).
+
+A comparação entre configurações (com e sem rerank, top-n, tamanho dos trechos) segue o protocolo da seção 6.6, variando um fator por vez.
+
+## 6.8 Concordância diagnóstica (nível 2 da seção 3.8 do TCC)
 
 O módulo de diagnóstico ([14. Diagnóstico](14-diagnostico.md)) mede a concordância entre a classificação proposta pelo protótipo e a decisão final do consultor (`backend/app/domain/concordancia.py`):
 
