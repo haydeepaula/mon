@@ -98,3 +98,10 @@ class ValidacaoIn(BaseModel):
     conceito_final: int | None = Field(None, ge=1, le=5)
     divergencia_causa: CausaLiteral | None = None
     comentario: str | None = Field(None, max_length=4000)
+
+
+class GutIn(BaseModel):
+    g: int = Field(ge=1, le=5)
+    u: int = Field(ge=1, le=5)
+    t: int = Field(ge=1, le=5)
+

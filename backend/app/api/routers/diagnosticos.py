@@ -4,6 +4,7 @@ import uuid
 from collections import Counter
 
 from fastapi import APIRouter, status
+from fastapi.responses import Response
 
 from app.api.deps import AdminUser, DbSession
 from app.api.schemas.diagnosticos import (
@@ -11,6 +12,7 @@ from app.api.schemas.diagnosticos import (
     DiagnosticoOut,
     DiagnosticoUpdate,
     EscopoIn,
+    GutIn,
     ItemOut,
     ValidacaoIn,
     VerificarIn,
@@ -158,6 +160,42 @@ def validate_item(diagnostico_id: uuid.UUID, item_id: uuid.UUID, body: Validacao
     )
     db.commit()
     return item_out(item, service.obter(diagnostico_id).escopo or {})
+
+
+# --- etapa 6: priorização GUT --------------------------------------------------------------------
+@router.get("/{diagnostico_id}/priorizacao", response_model=list[ItemOut])
+def prioritization(diagnostico_id: uuid.UUID, _: AdminUser, db: DbSession):
+    """Itens NC e PC em ordem de prioridade, com sugestões de G e U."""
+    service = DiagnosticoService(db)
+    itens = service.priorizacao(diagnostico_id)
+    db.commit()
+    escopo = service.obter(diagnostico_id).escopo or {}
+    return [item_out(i, escopo) for i in itens]
+
+
+@router.put("/{diagnostico_id}/itens/{item_id}/gut", response_model=ItemOut)
+def set_gut(diagnostico_id: uuid.UUID, item_id: uuid.UUID, body: GutIn, _: AdminUser, db: DbSession):
+    service = DiagnosticoService(db)
+    item = service.definir_gut(diagnostico_id, item_id, body.g, body.u, body.t)
+    db.commit()
+    return item_out(item, service.obter(diagnostico_id).escopo or {})
+
+
+# --- etapa 7: relatório ------------------------------------------------------------------------------
+@router.post("/{diagnostico_id}/relatorio", response_model=DiagnosticoOut)
+def issue_report(diagnostico_id: uuid.UUID, _: AdminUser, db: DbSession):
+    """Emite e congela o relatório; validação e priorização ficam bloqueadas."""
+    diagnostico = DiagnosticoService(db).emitir_relatorio(diagnostico_id)
+    db.commit()
+    return diagnostico_out(diagnostico)
+
+
+@router.get("/{diagnostico_id}/relatorio")
+def get_report(diagnostico_id: uuid.UUID, _: AdminUser, db: DbSession, download: bool = False):
+    """Relatório em Markdown: o emitido ou, antes da emissão, uma prévia."""
+    conteudo = DiagnosticoService(db).relatorio(diagnostico_id)
+    headers = {"Content-Disposition": f'attachment; filename="relatorio-{diagnostico_id}.md"'} if download else None
+    return Response(conteudo, media_type="text/markdown; charset=utf-8", headers=headers)
 
 
 # --- seção 3.8, nível 2 ---------------------------------------------------------------------------

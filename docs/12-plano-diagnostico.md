@@ -27,7 +27,7 @@ Princípio que guia todas as decisões: **o sistema propõe e o consultor decide
 | 2 | Domínio e persistência do framework: `Requisito`, versões, seed do Quadro 6, importação e exportação JSON/CSV | 3.5, Quadro 6 | concluída |
 | 3 | Recuperação de evidências por requisito (só institucional, normativo opcional) | 3.6.1 b | concluída |
 | 4 | Diagnóstico: job de verificação com saída estruturada C/PC/NC/EI, regras de EI, validação do consultor, percentual de acordo e kappa de Cohen | 3.6.1 c/d/e; Quadro 9 etapas 4-5; 3.8 nível 2 | concluída |
-| 5 | Priorização GUT com sugestões de G e U; relatório em Markdown | Quadro 9 etapas 6-7 | pendente |
+| 5 | Priorização GUT com sugestões de G e U; relatório em Markdown | Quadro 9 etapas 6-7 | concluída |
 | 6 | Tela do framework: edição e aprovação pelo orientador | 3.5 c | pendente |
 | 7 | Avaliação por requisito: hit rate e MRR por requisito e por tipo | 3.8 nível 1 | pendente |
 | 8 | DOCX, devolutiva, validação cega, comparação entre modelos | Quadro 9 etapa 8; ablação | pendente |

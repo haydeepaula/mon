@@ -70,6 +70,8 @@
 
       <div class="tabs">
         <button [class.active]="aba() === 'revisao'" (click)="abrirAba('revisao')">Verificação e validação</button>
+        <button [class.active]="aba() === 'priorizacao'" (click)="abrirAba('priorizacao')">Priorização GUT</button>
+        <button [class.active]="aba() === 'relatorio'" (click)="abrirAba('relatorio')">Relatório</button>
         <button [class.active]="aba() === 'concordancia'" (click)="abrirAba('concordancia')">Concordância</button>
         <button [class.active]="aba() === 'plano'" (click)="abrirAba('plano')">Plano e reprodutibilidade</button>
       </div>
@@ -296,6 +298,119 @@
                 <div class="empty">Selecione um requisito.</div>
               }
             </section>
+          </div>
+        }
+
+        @case ('priorizacao') {
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <h3>Matriz GUT</h3>
+                <p>
+                  Itens NC e PC ordenados por Gravidade × Urgência × Tendência (notas de 1 a 5). O Mon sugere G pela natureza
+                  do requisito e U pelos prazos; T e a decisão final são do consultor.
+                </p>
+              </div>
+              @if (podePriorizar()) {
+                <div class="row">
+                  <button class="btn" (click)="aplicarSugestoes()"><app-icon name="sparkles" [size]="14" /> Aplicar sugestões</button>
+                  <button class="btn primary" [disabled]="salvando()" (click)="salvarGut()"><app-icon name="check" [size]="14" /> Salvar</button>
+                </div>
+              }
+            </div>
+            @if (!podePriorizar() && d.status !== 'relatorio_emitido' && d.status !== 'concluido') {
+              <div class="alert info margin"><app-icon name="info" [size]="15" /> A priorização é liberada quando todos os itens estiverem validados.</div>
+            }
+            @if (gut().length) {
+              <div class="table-wrap">
+                <table class="table gut">
+                  <thead>
+                    <tr>
+                      <th>Requisito</th>
+                      <th>Classif.</th>
+                      <th class="num">G</th>
+                      <th class="num">U</th>
+                      <th class="num">T</th>
+                      <th class="num">G×U×T</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (linha of gut(); track linha.item.id) {
+                      <tr [class.changed]="alterado(linha)">
+                        <td>
+                          <span class="mono code">{{ linha.item.requisito_codigo }}</span>
+                          <div class="small muted">{{ linha.item.requisito.texto }}</div>
+                        </td>
+                        <td>
+                          @if (linha.item.classificacao_final) {
+                            <span class="badge" [class]="classInfo[linha.item.classificacao_final].tone">{{ linha.item.classificacao_final }}</span>
+                          }
+                        </td>
+                        <td class="num">
+                          <select class="select sm" [(ngModel)]="linha.g" [disabled]="!podePriorizar()" [title]="linha.item.gut_sugestao.motivo_g || ''">
+                            <option [ngValue]="null">—</option>
+                            @for (n of notas; track n) {
+                              <option [ngValue]="n">{{ n }}</option>
+                            }
+                          </select>
+                          <div class="sugestao">sug. {{ linha.item.gut_sugestao.g ?? '—' }}</div>
+                        </td>
+                        <td class="num">
+                          <select class="select sm" [(ngModel)]="linha.u" [disabled]="!podePriorizar()" [title]="linha.item.gut_sugestao.motivo_u || ''">
+                            <option [ngValue]="null">—</option>
+                            @for (n of notas; track n) {
+                              <option [ngValue]="n">{{ n }}</option>
+                            }
+                          </select>
+                          <div class="sugestao">sug. {{ linha.item.gut_sugestao.u ?? '—' }}</div>
+                        </td>
+                        <td class="num">
+                          <select class="select sm" [(ngModel)]="linha.t" [disabled]="!podePriorizar()">
+                            <option [ngValue]="null">—</option>
+                            @for (n of notas; track n) {
+                              <option [ngValue]="n">{{ n }}</option>
+                            }
+                          </select>
+                        </td>
+                        <td class="num strong">{{ produto(linha) ?? '—' }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            } @else {
+              <div class="empty">Nenhum item não conforme ou parcialmente conforme validado.</div>
+            }
+          </div>
+        }
+
+        @case ('relatorio') {
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <h3>Relatório de diagnóstico</h3>
+                <p>
+                  @if (d.relatorio_emitido_em) {
+                    Emitido em {{ d.relatorio_emitido_em | dateTime }}. Conteúdo congelado.
+                  } @else {
+                    Prévia. A emissão congela o relatório e encerra a validação e a priorização.
+                  }
+                </p>
+              </div>
+              <div class="row">
+                <button class="btn" [disabled]="!relatorio()" (click)="baixarRelatorio()"><app-icon name="download" [size]="14" /> Markdown</button>
+                @if (!d.relatorio_emitido_em) {
+                  <button class="btn primary" [disabled]="!podeEmitir()" (click)="emitirRelatorio()"><app-icon name="file-text" [size]="14" /> Emitir relatório</button>
+                }
+              </div>
+            </div>
+            <div class="card-body">
+              @if (relatorio(); as md) {
+                <div class="markdown report" [innerHTML]="md | markdown"></div>
+              } @else {
+                <div class="empty"><span class="spinner"></span></div>
+              }
+            </div>
           </div>
         }
 

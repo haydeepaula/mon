@@ -101,6 +101,10 @@ Ver [14. Diagnóstico](14-diagnostico.md).
 | POST | `/diagnosticos/{id}/verificar` | Agenda a verificação assistida (`{item_ids?}`); retorna o job | 4 |
 | GET | `/diagnosticos/{id}/itens`, `/diagnosticos/{id}/itens/{item}` | Itens com requisito, evidências e proposta (oculta na validação cega) | 4-5 |
 | PUT | `/diagnosticos/{id}/itens/{item}/validacao` | `{classificacao_final, conceito_final, divergencia_causa, comentario}` | 5 |
+| GET | `/diagnosticos/{id}/priorizacao` | Itens NC e PC em ordem de prioridade, com sugestões de G e U | 6 |
+| PUT | `/diagnosticos/{id}/itens/{item}/gut` | `{g, u, t}` de 1 a 5 | 6 |
+| POST | `/diagnosticos/{id}/relatorio` | Emite e congela o relatório | 7 |
+| GET | `/diagnosticos/{id}/relatorio?download=` | Relatório em Markdown (emitido ou prévia) | 7 |
 | GET | `/diagnosticos/{id}/metricas?referencia=` | Concordância: acordo, κ, matriz de confusão, causas | 3.8, nível 2 |
 
 ## Saúde

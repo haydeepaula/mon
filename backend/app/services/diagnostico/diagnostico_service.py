@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.core.exceptions import ConflictError, NotFoundError, ValidationError
 from app.db.models import Diagnostico, DiagnosticoItem, Document, DocumentStatus, Job, JobType, utcnow
+from app.domain import gut
 from app.domain.concordancia import resumo_concordancia
 from app.domain.diagnostico import (
     CausaDivergencia,
@@ -31,6 +32,7 @@ from app.domain.framework import FORMATOS_OFERTA, FiltroRequisitos, Requisito, r
 from app.domain.knowledge_base import Colecao
 from app.repositories.framework_repository import SqlFrameworkRepository
 from app.services.diagnostico.prompt import carregar_instrucao
+from app.services.diagnostico.relatorio import gerar_relatorio
 from app.services.job_service import JobService
 from app.services.settings_service import SettingsService
 
@@ -308,6 +310,8 @@ class DiagnosticoService:
         item.validado_em = utcnow()
         if final not in (Classificacao.NC, Classificacao.PC):
             self._limpar_gut(item)
+        if diagnostico.status == DiagnosticoStatus.PRIORIZADO:
+            self._atualizar_status_priorizacao(diagnostico)
 
         if diagnostico.status == DiagnosticoStatus.EM_VALIDACAO and all(i.classificacao_final for i in diagnostico.itens):
             diagnostico.status = DiagnosticoStatus.VALIDADO
@@ -353,3 +357,61 @@ class DiagnosticoService:
             }
         )
         return resumo
+
+    # --- etapa 6: priorização GUT -------------------------------------------------------------
+    def priorizacao(self, diagnostico_id: uuid.UUID, hoje: date | None = None) -> list[DiagnosticoItem]:
+        """Itens NC e PC ordenados por G×U×T, com as sugestões de G e U atualizadas."""
+        diagnostico = self.obter(diagnostico_id)
+        hoje = hoje or date.today()
+        data_ato = (diagnostico.escopo or {}).get("data_ato")
+        itens = [i for i in diagnostico.itens if gut.priorizavel(i.classificacao_final)]
+        for item in itens:
+            item.gut_sugestao = gut.sugerir(item.requisito or {}, item.classificacao_final, data_ato, hoje).to_dict()
+        self.session.flush()
+        return sorted(itens, key=lambda i: gut.chave_ranking(i.prioridade, i.gut_g, i.gut_u, i.requisito_codigo))
+
+    def definir_gut(self, diagnostico_id: uuid.UUID, item_id: uuid.UUID, g: int, u: int, t: int) -> DiagnosticoItem:
+        diagnostico = self.obter(diagnostico_id)
+        if diagnostico.status not in {DiagnosticoStatus.VALIDADO, DiagnosticoStatus.PRIORIZADO}:
+            raise ConflictError("A priorização é feita depois da validação de todos os itens e antes do relatório.")
+        item = self.item(diagnostico_id, item_id)
+        if not gut.priorizavel(item.classificacao_final):
+            raise ValidationError("Apenas itens não conformes (NC) ou parcialmente conformes (PC) são priorizados.")
+        try:
+            item.gut_g, item.gut_u, item.gut_t = (gut.validar_nota(n, v) for n, v in (("G", g), ("U", u), ("T", t)))
+        except ValueError as exc:
+            raise ValidationError(str(exc)) from None
+        item.prioridade = item.gut_g * item.gut_u * item.gut_t
+        self._atualizar_status_priorizacao(diagnostico)
+        self.session.flush()
+        return item
+
+    def _atualizar_status_priorizacao(self, diagnostico: Diagnostico) -> None:
+        alvo = [i for i in diagnostico.itens if gut.priorizavel(i.classificacao_final)]
+        if all(i.prioridade is not None for i in alvo):
+            diagnostico.status = DiagnosticoStatus.PRIORIZADO
+        elif diagnostico.status == DiagnosticoStatus.PRIORIZADO:
+            diagnostico.status = DiagnosticoStatus.VALIDADO
+
+    # --- etapa 7: relatório -------------------------------------------------------------------------
+    def relatorio(self, diagnostico_id: uuid.UUID) -> str:
+        """Relatório emitido (congelado) ou, antes da emissão, uma prévia."""
+        diagnostico = self.obter(diagnostico_id)
+        if diagnostico.relatorio_md:
+            return diagnostico.relatorio_md
+        return gerar_relatorio(diagnostico)
+
+    def emitir_relatorio(self, diagnostico_id: uuid.UUID) -> Diagnostico:
+        diagnostico = self.obter(diagnostico_id)
+        if diagnostico.status == DiagnosticoStatus.VALIDADO:
+            # Sem itens NC/PC não há o que priorizar.
+            self._atualizar_status_priorizacao(diagnostico)
+        if diagnostico.status != DiagnosticoStatus.PRIORIZADO:
+            raise ConflictError("Valide todos os itens e priorize os NC e PC antes de emitir o relatório.")
+        emitido_em = utcnow()
+        diagnostico.metricas = self.metricas(diagnostico)
+        diagnostico.relatorio_md = gerar_relatorio(diagnostico, emitido_em)
+        diagnostico.relatorio_emitido_em = emitido_em
+        diagnostico.status = DiagnosticoStatus.RELATORIO_EMITIDO
+        self.session.flush()
+        return diagnostico

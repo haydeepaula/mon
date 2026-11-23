@@ -56,6 +56,22 @@ export class DiagnosticoApi {
     return firstValueFrom(this.http.put<DiagnosticoItem>(`${this.base}/${id}/itens/${itemId}/validacao`, data));
   }
 
+  prioritization(id: string) {
+    return firstValueFrom(this.http.get<DiagnosticoItem[]>(`${this.base}/${id}/priorizacao`));
+  }
+
+  setGut(id: string, itemId: string, g: number, u: number, t: number) {
+    return firstValueFrom(this.http.put<DiagnosticoItem>(`${this.base}/${id}/itens/${itemId}/gut`, { g, u, t }));
+  }
+
+  issueReport(id: string) {
+    return firstValueFrom(this.http.post<Diagnostico>(`${this.base}/${id}/relatorio`, {}));
+  }
+
+  report(id: string) {
+    return firstValueFrom(this.http.get(`${this.base}/${id}/relatorio`, { responseType: 'text' }));
+  }
+
   metrics(id: string, referencia?: string | null) {
     const params = new HttpParams({ fromObject: referencia ? { referencia } : {} });
     return firstValueFrom(this.http.get<Concordancia>(`${this.base}/${id}/metricas`, { params }));

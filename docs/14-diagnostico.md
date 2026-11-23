@@ -51,20 +51,45 @@ A proposta **nunca é sobrescrita** (adaptação "d" da seção 3.6.1): os campo
 
 **Validação cega:** com essa opção no plano, a API omite a proposta e as pontuações das evidências até o consultor registrar sua classificação. Assim a decisão não é ancorada na sugestão do sistema, e o kappa mede concordância real (seção 3.8, nível 2).
 
-## 14.5 Reprodutibilidade
+## 14.5 Priorização GUT
+
+Depois que todos os itens estão validados, os classificados como **NC** ou **PC** são priorizados pela matriz GUT (seção 3.5), com notas de 1 a 5 e prioridade igual ao produto G × U × T (`domain/gut.py`). O sistema sugere G e U; T e a decisão final são do consultor.
+
+| Nota | Sugestão |
+|---|---|
+| G (gravidade) | A `gravidade_base` do requisito, quando definida. Sem ela: obrigação legal = 5; indicador de qualidade = 4 em dimensão de peso 40 e 3 nas demais; competência = 3. Itens PC recebem um ponto a menos que os NC |
+| U (urgência) | Meses até o prazo mais próximo entre o `prazo_referencia` do requisito e a data do próximo ato informada no plano: até 6 meses (ou vencido) = 5; até 12 = 4; até 24 = 3; mais = 2. Sem prazo, não há sugestão |
+| T (tendência) | Sem sugestão |
+
+A ordem é G × U × T decrescente; empates são resolvidos por G, depois U, depois código. Quando todos os itens NC e PC têm prioridade, o diagnóstico passa a `priorizado`. Alterar a validação de um item priorizado limpa a GUT se ele deixar de ser NC ou PC e reabre a priorização se ele passar a ser.
+
+## 14.6 Relatório
+
+`services/diagnostico/relatorio.py` gera o relatório em Markdown:
+
+1. **Identificação:** curso, formato de oferta, próximo ato, versão do framework, modelo e data da verificação, aviso sobre o caráter preliminar dos conceitos;
+2. **Resumo:** contagem por classificação, por tipo de requisito e conceito médio estimado por dimensão do INEP;
+3. **Prioridades:** tabela GUT;
+4. **Achados por requisito:** classificação, conceito, prioridade, análise do consultor, fundamentação (ou a proposta do protótipo, quando corrigida pelo consultor), lacunas e evidências citadas com documento, página e trecho;
+5. **Diligências:** requisitos com evidência insuficiente e o que pedir ao curso;
+6. **Apêndice:** concordância entre protótipo e consultor.
+
+A definição das ações corretivas fica fora do relatório, pois cabe à gestão do curso. Antes da emissão, `GET /relatorio` devolve uma prévia; a emissão (`POST /relatorio`) congela o conteúdo em `relatorio_md`, registra a data e bloqueia validação e priorização.
+
+## 14.7 Reprodutibilidade
 
 Cada execução da verificação registra em `diagnosticos.config.execucoes`: data, provedor e modelo do LLM, nível de raciocínio, parâmetros de recuperação e rerank, tamanho dos trechos, hash da instrução de sistema e um retrato da base institucional (id, nome, versão, hash e páginas com OCR de cada documento). O job usa o modelo registrado ao ser enfileirado, mesmo que a configuração mude no intervalo. Com isso se respondem às ameaças à validade da seção 3.8 (mudança de versão dos modelos dos provedores) e se preserva a cadeia de evidências (YIN, 2015).
 
-## 14.6 Concordância
+## 14.8 Concordância
 
 Ver [6.7](06-avaliacao.md#67-concordância-diagnóstica-nível-2-da-seção-38-do-tcc). A aba "Concordância" mostra percentual de acordo, κ de Cohen com interpretação, κ ponderado do conceito INEP, matriz de confusão, divergências por causa e acordo por tipo de requisito.
 
-## 14.7 Arquitetura
+## 14.9 Arquitetura
 
 | Camada | Arquivo |
 |---|---|
-| Regras (puras) | `domain/diagnostico.py` (escala, schema, pós-validação), `domain/concordancia.py` (métricas) |
-| Casos de uso | `services/diagnostico/diagnostico_service.py`, `verificacao_service.py`, `prompt.py` |
+| Regras (puras) | `domain/diagnostico.py` (escala, schema, pós-validação), `domain/concordancia.py` (métricas), `domain/gut.py` (priorização) |
+| Casos de uso | `services/diagnostico/diagnostico_service.py`, `verificacao_service.py`, `prompt.py`, `relatorio.py` |
 | Job | `workers/handlers.py` (`DiagnosticoVerificarHandler`) |
 | Persistência | Tabelas `diagnosticos` e `diagnostico_itens` (`db/models.py`) |
 | API | `api/routers/diagnosticos.py` |
