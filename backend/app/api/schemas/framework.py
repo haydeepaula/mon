@@ -118,3 +118,29 @@ class FrameworkImportResult(BaseModel):
     criados: int
     atualizados: int
     total: int
+
+
+class EvidenciaOut(ORMModel):
+    documento: str
+    trecho: str
+    score: float
+    chunk_id: str
+    pagina: int | None
+    document_id: str | None
+    versao: int | None
+    sha256: str | None
+    ocr: bool
+    colecao: str | None
+    tipo_documento: str | None
+    localizacao: str | None
+    vector_score: float | None
+    rerank_score: float | None
+
+
+class RecuperacaoOut(ORMModel):
+    requisito: RequisitoOut
+    consulta: str
+    evidencias: list[EvidenciaOut]
+    normativos: list[EvidenciaOut]
+    timings_ms: dict[str, int]
+    config: dict[str, Any]

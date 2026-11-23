@@ -12,6 +12,7 @@ from app.api.deps import AdminUser, DbSession
 from app.api.schemas.framework import (
     FrameworkImport,
     FrameworkImportResult,
+    RecuperacaoOut,
     RequisitoCreate,
     RequisitoOut,
     RequisitoUpdate,
@@ -24,6 +25,7 @@ from app.api.schemas.framework import (
 from app.db.models import FrameworkVersao
 from app.domain.framework import FiltroRequisitos, StatusValidacao
 from app.repositories.framework_repository import SqlFrameworkRepository
+from app.services.framework.evidence_retrieval_service import EvidenceRetrievalService
 from app.services.framework.framework_service import FrameworkService
 
 router = APIRouter(prefix="/framework", tags=["Framework de critérios"])
@@ -130,6 +132,21 @@ def update_requirement(codigo: str, body: RequisitoUpdate, _: AdminUser, db: DbS
 def delete_requirement(codigo: str, _: AdminUser, db: DbSession, versao: str | None = None):
     FrameworkService(db).excluir_requisito(codigo, versao)
     db.commit()
+
+
+@router.get("/requisitos/{codigo}/evidencias", response_model=RecuperacaoOut)
+def requirement_evidence(
+    codigo: str,
+    _: AdminUser,
+    db: DbSession,
+    versao: str | None = None,
+    curso: str | None = None,
+    top_n: int | None = Query(None, ge=1, le=20),
+    incluir_normativa: bool = False,
+):
+    """Evidências candidatas do requisito na coleção institucional (seção 3.6.1 b)."""
+    service = EvidenceRetrievalService.from_settings(db)
+    return service.recuperar_detalhado(codigo, curso, top_n, versao, incluir_normativa)
 
 
 @router.patch("/requisitos/{codigo}/validacao", response_model=RequisitoOut)

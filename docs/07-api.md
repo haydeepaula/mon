@@ -83,6 +83,7 @@ Ver [13. Framework de critérios](13-framework-de-criterios.md). O parâmetro `v
 | GET | `/framework/requisitos?versao=&tipo=&grupo=&dimensao=&formato=&status_validacao=&incluir_tendencia=&q=` | Lista requisitos filtrados |
 | POST | `/framework/requisitos?versao=` | Cria requisito |
 | GET / PUT / DELETE | `/framework/requisitos/{codigo}?versao=` | Consulta / altera parcialmente / exclui |
+| GET | `/framework/requisitos/{codigo}/evidencias?versao=&curso=&top_n=&incluir_normativa=` | Evidências candidatas na coleção institucional, com consulta usada, tempos e configuração |
 | PATCH | `/framework/requisitos/{codigo}/validacao?versao=` | Revisão do orientador: `{status: pendente\|aprovado\|ajustar, comentario}` |
 | POST | `/framework/importar` | Importa JSON `{versao, modo: mesclar\|substituir, requisitos: [...]}` |
 | POST | `/framework/importar/csv` | Importa CSV (multipart: `file`, `versao`, `modo`) |

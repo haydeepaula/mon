@@ -60,3 +60,19 @@ A importação valida o lote inteiro e informa todos os erros de uma vez (códig
 - **Adaptador** `SqlFrameworkRepository` (`repositories/framework_repository.py`).
 - **Casos de uso** `FrameworkService` (`services/framework/framework_service.py`): versões, CRUD, validação, importação e exportação.
 - **API**: `api/routers/framework.py` (ver [7. API](07-api.md)).
+
+## 13.5 Recuperação de evidências por requisito
+
+`EvidenceRetrievalService` (`services/framework/evidence_retrieval_service.py`) implementa a consulta orientada por requisito da seção 3.6.1 b. Para cada requisito:
+
+1. monta a consulta padronizada (`consulta_padrao` e `termos_chave`; na falta, o texto e a evidência esperada);
+2. faz uma busca vetorial restrita à coleção **institucional**, ao curso informado e aos `documentos_provaveis` do requisito;
+3. faz uma segunda busca em toda a coleção institucional do curso, que cobre documentos sem tipo e evidências fora do lugar esperado;
+4. une os candidatos sem duplicatas e os reordena com o reranker, mantendo os `top_n` mais relevantes acima da relevância mínima configurada.
+
+Com `incluir_normativa`, recupera também até três trechos da coleção **normativa** com o texto de origem do requisito.
+
+Cada evidência (`Evidencia`) traz documento, versão e hash do arquivo, página e localização, se veio de OCR, coleção, tipo e as pontuações vetorial e de rerank. O resultado detalhado (`RecuperacaoRequisito`) inclui ainda a consulta usada, os tempos de cada etapa e a configuração (modelos, `top_k`, `top_n`, número de candidatos), registrados pelo diagnóstico para reprodutibilidade (seção 3.8).
+
+A pontuação `score` é a do reranker quando ele está ligado e a similaridade de cosseno quando não está; por isso, não se comparam pontuações entre execuções com configurações diferentes.
+

@@ -188,3 +188,38 @@ def test_colecoes_logicas_filtram_a_busca(store, session, tmp_path):
     for result in (norma, ppc):
         documents.delete(result.document.id)
     session.commit()
+
+
+def test_recuperacao_por_requisito_no_qdrant(store, session, tmp_path):
+    from app.infrastructure.rerank.cohere_reranker import PassthroughReranker
+    from app.services.framework.evidence_retrieval_service import EvidenceRetrievalService
+    from tests.fakes import MemoryFrameworkRepository
+
+    rag_settings = RagSettings(chunk_size=300, chunk_overlap=50, query_rewrite_enabled=False)
+    documents = DocumentService(session, LocalFileStorage(tmp_path), store, get_loader_factory())
+    ingestion = IngestionService(session, get_loader_factory(), build_chunker(rag_settings), HashEmbedder(), store)
+    tag = uuid.uuid4().hex[:8]
+    texto = "Atividades de extensão na matriz curricular com carga horária de 360 horas."
+    enviados = [
+        documents.upload(f"matriz-{tag}.txt", io.BytesIO(texto.encode()), None, "institucional", "matriz", "ep"),
+        documents.upload(f"ata-{tag}.txt", io.BytesIO(("Ata: " + texto).encode()), None, "institucional", None, "ep"),
+        documents.upload(f"adm-{tag}.txt", io.BytesIO(texto.encode() + b" ADM"), None, "institucional", "matriz", "adm"),
+        documents.upload(f"norma-{tag}.txt", io.BytesIO(texto.encode() + b" Art. 4"), None, "normativa", "resolucao"),
+    ]
+    session.commit()
+    for enviado in enviados:
+        ingestion.ingest(enviado.document.id)
+
+    framework = MemoryFrameworkRepository([{
+        "codigo": "EXT-01", "fonte_documento": "Resolução CNE/CES nº 7/2018", "tipo": "legal",
+        "texto": "Mínimo de 10% em extensão", "evidencia_esperada": "Matriz",
+        "documentos_provaveis": ["matriz"], "consulta_padrao": "extensão matriz curricular carga horária",
+    }])
+    service = EvidenceRetrievalService(framework, HashEmbedder(), store, PassthroughReranker(), top_k=10, top_n=10)
+    resultado = service.recuperar_detalhado("EXT-01", curso="ep", incluir_normativa=True)
+    assert {e.documento for e in resultado.evidencias} == {f"matriz-{tag}.txt", f"ata-{tag}.txt"}
+    assert [n.documento for n in resultado.normativos] == [f"norma-{tag}.txt"]
+
+    for enviado in enviados:
+        documents.delete(enviado.document.id)
+    session.commit()

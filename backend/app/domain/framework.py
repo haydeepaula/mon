@@ -305,3 +305,39 @@ def validar_lote(itens: list[dict[str, Any]]) -> list[Requisito]:
     if erros:
         raise ValueError("Framework inválido:\n" + "\n".join(erros[:50]))
     return requisitos
+
+
+@dataclass
+class Evidencia:
+    """Trecho de documento recuperado como evidência candidata de um requisito.
+
+    Carrega o necessário para a cadeia de evidências (YIN, 2015): documento, versão
+    e hash do arquivo, localização e se o texto veio de OCR (análise de divergências).
+    """
+
+    documento: str  # nome do arquivo
+    trecho: str
+    score: float  # relevância: rerank quando houver, senão similaridade de cosseno
+    chunk_id: str
+    pagina: int | None = None
+    document_id: str | None = None
+    versao: int | None = None
+    sha256: str | None = None
+    ocr: bool = False
+    colecao: str | None = None
+    tipo_documento: str | None = None
+    localizacao: str | None = None  # "pág. 3", "aba Matriz", "seção Perfil do egresso"
+    vector_score: float | None = None
+    rerank_score: float | None = None
+
+
+@dataclass
+class RecuperacaoRequisito:
+    """Resultado completo da recuperação para um requisito (auditoria e reprodutibilidade)."""
+
+    requisito: Requisito
+    consulta: str
+    evidencias: list[Evidencia]
+    normativos: list[Evidencia] = field(default_factory=list)
+    timings_ms: dict[str, int] = field(default_factory=dict)
+    config: dict[str, Any] = field(default_factory=dict)
