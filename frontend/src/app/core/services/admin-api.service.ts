@@ -3,8 +3,10 @@ import { inject, Injectable } from '@angular/core';
 import { firstValueFrom, Observable } from 'rxjs';
 
 import {
+  Colecao,
   DocumentItem,
   DocumentStats,
+  DocumentVocabulary,
   EvalCase,
   EvalCaseInput,
   EvalRun,
@@ -18,14 +20,22 @@ import {
   UploadItem,
 } from '../models/api.models';
 
+export interface DocumentClassification {
+  colecao: Colecao;
+  tipo_documento: string | null;
+  curso: string | null;
+}
+
 /** Endpoints da área administrativa: documentos, jobs, modelos e avaliação. */
 @Injectable({ providedIn: 'root' })
 export class AdminApi {
   private readonly http = inject(HttpClient);
 
   // Documentos
-  documents(q = '', status = '') {
-    const params = new HttpParams({ fromObject: { ...(q && { q }), ...(status && { status_filter: status }) } });
+  documents(q = '', status = '', colecao = '') {
+    const params = new HttpParams({
+      fromObject: { ...(q && { q }), ...(status && { status_filter: status }), ...(colecao && { colecao }) },
+    });
     return firstValueFrom(this.http.get<DocumentItem[]>('/api/documents', { params }));
   }
 
@@ -37,9 +47,22 @@ export class AdminApi {
     return firstValueFrom(this.http.get<string[]>('/api/documents/names'));
   }
 
-  upload(file: File): Observable<HttpEvent<UploadItem[]>> {
+  documentVocabulary() {
+    return firstValueFrom(this.http.get<DocumentVocabulary>('/api/documents/vocabulary'));
+  }
+
+  classifyDocument(id: string, data: DocumentClassification) {
+    return firstValueFrom(this.http.patch<DocumentItem>(`/api/documents/${id}`, data));
+  }
+
+  upload(file: File, classificacao?: DocumentClassification): Observable<HttpEvent<UploadItem[]>> {
     const form = new FormData();
     form.append('files', file, file.name);
+    if (classificacao) {
+      form.append('colecao', classificacao.colecao);
+      if (classificacao.tipo_documento) form.append('tipo_documento', classificacao.tipo_documento);
+      if (classificacao.curso) form.append('curso', classificacao.curso);
+    }
     return this.http.post<UploadItem[]>('/api/documents/upload', form, {
       reportProgress: true,
       observe: 'events',

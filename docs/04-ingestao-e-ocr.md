@@ -141,7 +141,7 @@ A coleção é um campo (`colecao`, junto com `tipo_documento` e `curso`) gravad
 Formas de classificar:
 
 - **Pasta de fontes:** a subpasta define a classificação: `data/sources/normativa/<tipo>/arquivo` ou `data/sources/institucional/<tipo>/arquivo`. Arquivos fora dessas pastas mantêm a classificação atual.
-- **Upload:** campos opcionais `colecao`, `tipo_documento` e `curso`.
+- **Upload:** campos opcionais `colecao`, `tipo_documento` e `curso` (na tela de Documentos, pela barra acima da área de envio).
 - **Reclassificação:** `PATCH /api/documents/{id}` atualiza o banco e o payload no Qdrant sem gerar embeddings de novo.
 
 Na inicialização, a API e o worker replicam no Qdrant a classificação de todos os documentos indexados, o que cobre pontos gravados antes da existência desses campos.

@@ -40,6 +40,11 @@ export const routes: Routes = [
             loadComponent: () => import('./features/admin/jobs/jobs-page').then((m) => m.JobsPage),
           },
           {
+            path: 'framework',
+            title: 'Framework de critérios · Mon',
+            loadComponent: () => import('./features/admin/framework/framework-page').then((m) => m.FrameworkPage),
+          },
+          {
             path: 'diagnosticos',
             title: 'Diagnósticos · Mon',
             loadComponent: () => import('./features/diagnosticos/diagnosticos-page').then((m) => m.DiagnosticosPage),

@@ -1,0 +1,361 @@
+<div class="page">
+  <div class="page-inner">
+    <header class="page-header">
+      <div>
+        <div class="eyebrow">Consultoria</div>
+        <h1>Framework de critérios</h1>
+        <p>
+          Requisitos normativos, de qualidade e de competências que o diagnóstico verifica. O framework é versionado:
+          o orientador revisa cada requisito, e a versão validada fica imutável.
+        </p>
+      </div>
+      <div class="actions">
+        <button class="btn" (click)="importDialog.set(true)" [disabled]="!editavel()"><app-icon name="upload" [size]="15" /> Importar</button>
+        <button class="btn" (click)="exportar('csv')" [disabled]="!versao()"><app-icon name="download" [size]="15" /> CSV</button>
+        <button class="btn" (click)="exportar('json')" [disabled]="!versao()"><app-icon name="download" [size]="15" /> JSON</button>
+      </div>
+    </header>
+
+    @if (versao(); as v) {
+      <section class="card version">
+        <div class="row wrap">
+          <div class="field compact">
+            <label>Versão</label>
+            <select class="select" [ngModel]="versaoSel()" (ngModelChange)="trocarVersao($event)">
+              @for (opcao of versoes(); track opcao.id) {
+                <option [value]="opcao.versao">v{{ opcao.versao }} · {{ statusVersao[opcao.status].label }}{{ opcao.ativa ? ' · ativa' : '' }}</option>
+              }
+            </select>
+          </div>
+          <span class="badge" [class]="statusVersao[v.status].tone">{{ statusVersao[v.status].label }}</span>
+          @if (v.ativa) {
+            <span class="badge primary">Ativa</span>
+          }
+          <span class="grow"></span>
+          @switch (v.status) {
+            @case ('rascunho') {
+              <button class="btn" (click)="mudarStatus('em_validacao')"><app-icon name="send" [size]="14" /> Enviar para validação</button>
+            }
+            @case ('em_validacao') {
+              <button class="btn" (click)="mudarStatus('rascunho')">Voltar a rascunho</button>
+              <button class="btn primary" (click)="mudarStatus('validado')" [disabled]="v.aprovados < v.total_requisitos">
+                <app-icon name="check-circle" [size]="14" /> Marcar como validado
+              </button>
+            }
+          }
+          @if (!v.ativa && v.status !== 'arquivado') {
+            <button class="btn" (click)="ativar()">Ativar</button>
+          }
+          <button class="btn" (click)="clonar()"><app-icon name="copy" [size]="14" /> Nova versão</button>
+          @if (v.status !== 'arquivado' && !v.ativa) {
+            <button class="btn ghost" (click)="mudarStatus('arquivado')">Arquivar</button>
+          }
+        </div>
+        @if (v.descricao) {
+          <p class="muted desc">{{ v.descricao }}</p>
+        }
+        <div class="progress-line">
+          <div class="progress"><span [style.width.%]="v.total_requisitos ? (v.aprovados / v.total_requisitos) * 100 : 0"></span></div>
+          <span class="muted small">
+            {{ contagem().aprovados }} aprovados · {{ contagem().ajustar }} a ajustar · {{ contagem().pendentes }} pendentes
+            @if (v.validado_em) {
+              · validado em {{ v.validado_em | dateTime }}
+            }
+          </span>
+        </div>
+      </section>
+
+      <div class="layout">
+        <section class="card list">
+          <div class="filters">
+            <input class="input sm" placeholder="Buscar" [(ngModel)]="busca" (keyup.enter)="carregarRequisitos()" />
+            <select class="select sm" [(ngModel)]="filtroTipo" (ngModelChange)="carregarRequisitos()">
+              <option value="">Todos os tipos</option>
+              @for (t of tipos; track t[0]) {
+                <option [value]="t[0]">{{ t[1] }}</option>
+              }
+            </select>
+            <select class="select sm" [(ngModel)]="filtroStatus" (ngModelChange)="carregarRequisitos()">
+              <option value="">Toda revisão</option>
+              <option value="pendente">Pendentes</option>
+              <option value="aprovado">Aprovados</option>
+              <option value="ajustar">A ajustar</option>
+            </select>
+            @if (editavel()) {
+              <button class="btn sm primary" (click)="novo()"><app-icon name="plus" [size]="14" /> Requisito</button>
+            }
+          </div>
+          <div class="items">
+            @for (r of requisitos(); track r.codigo) {
+              <button class="item" [class.active]="selecionado()?.codigo === r.codigo" (click)="selecionar(r)">
+                <div class="row">
+                  <span class="mono code">{{ r.codigo }}</span>
+                  <span class="chip">{{ tipoInfo[r.tipo] }}</span>
+                  @if (r.situacao_normativa === 'tendencia') {
+                    <span class="chip warn">tendência</span>
+                  }
+                  <span class="grow"></span>
+                  <span class="badge" [class]="statusReq[r.status_validacao].tone">{{ statusReq[r.status_validacao].label }}</span>
+                </div>
+                <div class="item-text">{{ r.texto }}</div>
+              </button>
+            } @empty {
+              <div class="empty">Nenhum requisito.</div>
+            }
+          </div>
+        </section>
+
+        <section class="card detail">
+          @if (editor(); as e) {
+            <form class="editor" (ngSubmit)="salvar(e)">
+              <h3>{{ e.novo ? 'Novo requisito' : 'Editar ' + e.codigo }}</h3>
+              <div class="grid-3">
+                <div class="field">
+                  <label>Código</label>
+                  <input class="input mono" name="codigo" [(ngModel)]="e.codigo" [disabled]="!e.novo" placeholder="REG-04" required />
+                </div>
+                <div class="field">
+                  <label>Tipo</label>
+                  <select class="select" name="tipo" [(ngModel)]="e.tipo">
+                    @for (t of tipos; track t[0]) {
+                      <option [value]="t[0]">{{ t[1] }}</option>
+                    }
+                  </select>
+                </div>
+                <div class="field">
+                  <label>Gravidade base (1–5)</label>
+                  <select class="select" name="gravidade" [(ngModel)]="e.gravidade_base">
+                    <option [ngValue]="null">—</option>
+                    @for (n of [1, 2, 3, 4, 5]; track n) {
+                      <option [ngValue]="n">{{ n }}</option>
+                    }
+                  </select>
+                </div>
+              </div>
+              <div class="field">
+                <label>Texto do requisito</label>
+                <textarea class="textarea" name="texto" rows="2" [(ngModel)]="e.texto" required></textarea>
+              </div>
+              <div class="grid-2">
+                <div class="field">
+                  <label>Fonte (documento)</label>
+                  <input class="input" name="fonte" [(ngModel)]="e.fonte_documento" placeholder="Portaria MEC nº 378/2025" required />
+                </div>
+                <div class="field">
+                  <label>Dispositivo (artigo, indicador)</label>
+                  <input class="input" name="dispositivo" [(ngModel)]="e.fonte_dispositivo" placeholder="art. 5º, § 1º" />
+                </div>
+              </div>
+              @if (e.tipo === 'qualidade') {
+                <div class="grid-2">
+                  <div class="field">
+                    <label>Dimensão do INEP</label>
+                    <select class="select" name="dimensao" [(ngModel)]="e.dimensao_inep">
+                      <option [ngValue]="null">—</option>
+                      @for (n of [1, 2, 3, 4]; track n) {
+                        <option [ngValue]="n">Dimensão {{ n }}</option>
+                      }
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label>Indicador</label>
+                    <input class="input" name="indicador" [(ngModel)]="e.indicador_inep" placeholder="1.5" />
+                  </div>
+                </div>
+              }
+              <div class="field">
+                <label>Evidência esperada</label>
+                <textarea class="textarea" name="evidencia" rows="2" [(ngModel)]="e.evidencia_esperada" required></textarea>
+              </div>
+              <div class="field">
+                <label>Documentos prováveis</label>
+                <div class="chips">
+                  @for (tipo of tiposDocumento(); track tipo) {
+                    <button type="button" class="chip toggle" [class.on]="e.documentos_provaveis.includes(tipo)"
+                      (click)="e.documentos_provaveis = alternar(e.documentos_provaveis, tipo)">{{ tipo }}</button>
+                  }
+                </div>
+              </div>
+              <div class="field">
+                <label>Consulta padronizada</label>
+                <input class="input" name="consulta" [(ngModel)]="e.consulta_padrao" placeholder="Como a evidência apareceria nos documentos do curso" />
+                <span class="hint">Usada na busca de evidências. Escreva com o vocabulário dos documentos do curso, não da norma.</span>
+              </div>
+              <div class="field">
+                <label>Termos-chave (separados por vírgula)</label>
+                <input class="input" name="termos" [(ngModel)]="e.termos_chave" />
+              </div>
+              <div class="grid-2">
+                <div class="field">
+                  <label>Formatos de oferta</label>
+                  <div class="chips">
+                    @for (f of formatos; track f) {
+                      <button type="button" class="chip toggle" [class.on]="e.formatos.includes(f)" (click)="e.formatos = alternar(e.formatos, f)">{{ f }}</button>
+                    }
+                  </div>
+                  <span class="hint">Nenhum = todos.</span>
+                </div>
+                <div class="field">
+                  <label>Situação normativa e prazo</label>
+                  <div class="row">
+                    <select class="select" name="situacao" [(ngModel)]="e.situacao_normativa">
+                      <option value="vigente">Vigente</option>
+                      <option value="tendencia">Tendência (em tramitação)</option>
+                    </select>
+                    <input class="input" type="date" name="prazo" [(ngModel)]="e.prazo_referencia" title="Prazo regulatório (sugere a urgência na GUT)" />
+                  </div>
+                </div>
+              </div>
+              <div class="row end">
+                <button type="button" class="btn" (click)="editor.set(null)">Cancelar</button>
+                <button type="submit" class="btn primary"><app-icon name="check" [size]="14" /> Salvar</button>
+              </div>
+            </form>
+          } @else if (selecionado(); as r) {
+            <div class="row">
+              <span class="mono code big">{{ r.codigo }}</span>
+              <span class="chip">{{ tipoInfo[r.tipo] }}</span>
+              <span class="badge" [class]="statusReq[r.status_validacao].tone">{{ statusReq[r.status_validacao].label }}</span>
+              <span class="grow"></span>
+              @if (editavel()) {
+                <button class="btn sm" (click)="editar(r)"><app-icon name="pencil" [size]="13" /> Editar</button>
+                <button class="btn sm ghost icon danger" title="Excluir" (click)="excluir(r)"><app-icon name="trash" [size]="14" /></button>
+              }
+            </div>
+            <p class="req-text">{{ r.texto }}</p>
+            <div class="kv">
+              <div><span>Fonte</span><strong>{{ r.fonte_documento }}{{ r.fonte_dispositivo ? ', ' + r.fonte_dispositivo : '' }}</strong></div>
+              @if (r.dimensao_inep) {
+                <div><span>Dimensão INEP</span><strong>{{ r.dimensao_inep }}{{ r.indicador_inep ? ' · indicador ' + r.indicador_inep : '' }} (peso {{ r.peso_dimensao ?? '—' }})</strong></div>
+              }
+              <div><span>Evidência esperada</span><strong>{{ r.evidencia_esperada }}</strong></div>
+              <div><span>Documentos prováveis</span><strong>{{ r.documentos_provaveis.join(', ') || '—' }}</strong></div>
+              <div><span>Consulta padronizada</span><strong>{{ r.consulta_padrao || '(texto + evidência esperada)' }}</strong></div>
+              <div><span>Termos-chave</span><strong>{{ r.termos_chave.join(', ') || '—' }}</strong></div>
+              <div><span>Formatos</span><strong>{{ r.formatos.join(', ') || 'todos' }}</strong></div>
+              <div><span>Situação</span><strong>{{ r.situacao_normativa }}{{ r.prazo_referencia ? ' · prazo ' + r.prazo_referencia : '' }}</strong></div>
+              <div><span>Gravidade base</span><strong>{{ r.gravidade_base ?? '—' }}</strong></div>
+            </div>
+
+            <div class="review-box">
+              <div class="section-title">Revisão do orientador (seção 3.5, passo c)</div>
+              @if (r.comentario_validacao && !editavel()) {
+                <p class="muted">{{ r.comentario_validacao }}</p>
+              }
+              @if (editavel()) {
+                <textarea class="textarea" rows="2" [(ngModel)]="comentario" placeholder="Comentário (obrigatório para pedir ajuste)"></textarea>
+                <div class="row end">
+                  <button class="btn" (click)="revisar(r, 'pendente')">Marcar como pendente</button>
+                  <button class="btn" (click)="revisar(r, 'ajustar')"><app-icon name="pencil" [size]="13" /> Pedir ajuste</button>
+                  <button class="btn primary" (click)="revisar(r, 'aprovado')"><app-icon name="check" [size]="13" /> Aprovar</button>
+                </div>
+              } @else {
+                <p class="muted small">Versão {{ versao()?.status }}: para alterar, crie uma nova versão.</p>
+              }
+            </div>
+
+            <div class="review-box">
+              <div class="section-title">Testar a recuperação de evidências</div>
+              <div class="row">
+                <input class="input sm" [(ngModel)]="cursoTeste" placeholder="Curso" />
+                <button class="btn sm" [disabled]="testando()" (click)="testarRecuperacao(r)">
+                  @if (testando()) {
+                    <span class="spinner small"></span>
+                  } @else {
+                    <app-icon name="search" [size]="13" />
+                  }
+                  Buscar evidências
+                </button>
+              </div>
+              @if (recuperacao(); as rec) {
+                <p class="muted small">Consulta: “{{ rec.consulta }}” · {{ rec.config['candidatos'] }} candidatos · {{ rec.timings_ms['search'] }} ms de busca</p>
+                @for (ev of rec.evidencias; track ev.chunk_id; let i = $index) {
+                  <article class="evidence">
+                    <header class="row">
+                      <span class="n">[{{ i + 1 }}]</span>
+                      <span class="grow truncate">{{ ev.localizacao || ev.documento }}</span>
+                      @if (ev.tipo_documento) {
+                        <span class="chip">{{ ev.tipo_documento }}</span>
+                      }
+                      @if (ev.ocr) {
+                        <span class="chip warn">OCR</span>
+                      }
+                      <span class="muted small">{{ ev.score | percent100 }}</span>
+                    </header>
+                    <p>{{ ev.trecho }}</p>
+                  </article>
+                } @empty {
+                  <div class="empty small">Nenhuma evidência na coleção institucional{{ cursoTeste ? ' do curso ' + cursoTeste : '' }}.</div>
+                }
+                @if (rec.normativos.length) {
+                  <div class="section-title spaced">Texto normativo</div>
+                  @for (ev of rec.normativos; track ev.chunk_id) {
+                    <article class="evidence normativo">
+                      <header class="row"><span class="grow truncate">{{ ev.localizacao || ev.documento }}</span></header>
+                      <p>{{ ev.trecho }}</p>
+                    </article>
+                  }
+                }
+              }
+            </div>
+          } @else {
+            <div class="empty">Selecione um requisito para ver, revisar ou editar.</div>
+          }
+        </section>
+      </div>
+    } @else if (loading()) {
+      <div class="empty"><span class="spinner"></span></div>
+    } @else {
+      <div class="card empty">
+        <strong>Nenhuma versão do framework</strong>
+        Importe um arquivo JSON ou CSV ou reinicie o backend para carregar o seed de data/framework.
+      </div>
+    }
+  </div>
+</div>
+
+@if (importDialog()) {
+  <div class="modal-backdrop" (click)="importDialog.set(false)">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Importar requisitos na versão {{ versaoSel() }}</h3>
+        <p>JSON (lista ou objeto com "requisitos") ou CSV separado por ";" no formato da exportação. O lote é validado por inteiro.</p>
+      </div>
+      <div class="modal-body">
+        <div class="field">
+          <label>Modo</label>
+          <select class="select" [(ngModel)]="importModo">
+            <option value="mesclar">Mesclar: atualiza pelo código e acrescenta os novos</option>
+            <option value="substituir">Substituir: troca todos os requisitos da versão</option>
+          </select>
+        </div>
+        <input #arquivo type="file" accept=".json,.csv" hidden (change)="importar(arquivo)" />
+      </div>
+      <div class="modal-footer">
+        <button class="btn" (click)="importDialog.set(false)">Cancelar</button>
+        <button class="btn primary" (click)="arquivo.click()"><app-icon name="upload" [size]="14" /> Escolher arquivo</button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (cloneDialog() !== null) {
+  <div class="modal-backdrop" (click)="cloneDialog.set(null)">
+    <form class="modal" (click)="$event.stopPropagation()" (ngSubmit)="confirmarClone(nomeClone.value)">
+      <div class="modal-header">
+        <h3>Nova versão a partir da {{ versaoSel() }}</h3>
+        <p>Os requisitos são copiados como rascunho e voltam a ficar pendentes de revisão.</p>
+      </div>
+      <div class="modal-body">
+        <div class="field">
+          <label>Identificador</label>
+          <input #nomeClone class="input" [value]="cloneDialog()" />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn" (click)="cloneDialog.set(null)">Cancelar</button>
+        <button type="submit" class="btn primary">Criar</button>
+      </div>
+    </form>
+  </div>
+}

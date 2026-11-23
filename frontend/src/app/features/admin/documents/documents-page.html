@@ -37,6 +37,21 @@
       </div>
     </div>
 
+    <div class="classify-bar">
+      <span class="label"><app-icon name="layers" [size]="15" /> Próximos envios entram em</span>
+      <select class="select sm" [ngModel]="envio().colecao" (ngModelChange)="mudarEnvio({ colecao: $event })">
+        <option value="institucional">Coleção institucional (documentos do curso)</option>
+        <option value="normativa">Coleção normativa (leis, portarias, instrumentos)</option>
+      </select>
+      <select class="select sm" [ngModel]="envio().tipo_documento" (ngModelChange)="mudarEnvio({ tipo_documento: $event })">
+        <option [ngValue]="null">Tipo não informado</option>
+        @for (tipo of tiposDe(envio().colecao); track tipo) {
+          <option [ngValue]="tipo">{{ tipo }}</option>
+        }
+      </select>
+      <input class="input sm" placeholder="Curso (ex.: eng-producao-ead)" [ngModel]="envio().curso" (ngModelChange)="mudarEnvio({ curso: $event })" />
+    </div>
+
     <label
       class="dropzone"
       [class.over]="dragOver()"
@@ -99,6 +114,11 @@
             <app-icon name="search" [size]="15" />
             <input class="input" placeholder="Buscar por nome" [(ngModel)]="query" (keyup.enter)="refresh()" />
           </div>
+          <select class="select" [(ngModel)]="colecaoFilter" (ngModelChange)="refresh()">
+            <option value="">Todas as coleções</option>
+            <option value="institucional">Institucional</option>
+            <option value="normativa">Normativa</option>
+          </select>
           <select class="select" [(ngModel)]="statusFilter" (ngModelChange)="refresh()">
             <option value="">Todos os status</option>
             <option value="indexed">Indexados</option>
@@ -135,6 +155,15 @@
                         {{ doc.file_type.toUpperCase() }} · {{ doc.size_bytes | fileSize }} ·
                         {{ doc.source === 'folder' ? 'pasta sincronizada' : 'upload' }}
                       </div>
+                      <div class="doc-tags">
+                        <span class="tag" [class.normativa]="doc.colecao === 'normativa'">{{ colecaoLabels[doc.colecao] || doc.colecao }}</span>
+                        @if (doc.tipo_documento) {
+                          <span class="tag">{{ doc.tipo_documento }}</span>
+                        }
+                        @if (doc.curso) {
+                          <span class="tag">{{ doc.curso }}</span>
+                        }
+                      </div>
                     </div>
                   </div>
                 </td>
@@ -154,6 +183,7 @@
                 <td>
                   <div class="row-actions">
                     <button class="btn sm ghost icon" title="Baixar" (click)="download(doc, $event)"><app-icon name="download" [size]="15" /></button>
+                    <button class="btn sm ghost icon" title="Classificar (coleção, tipo, curso)" (click)="abrirClassificacao(doc, $event)"><app-icon name="layers" [size]="15" /></button>
                     <button class="btn sm ghost icon" title="Reindexar" (click)="reindex(doc, $event)"><app-icon name="refresh" [size]="15" /></button>
                     <button class="btn sm ghost icon danger" title="Excluir" (click)="remove(doc, $event)"><app-icon name="trash" [size]="15" /></button>
                   </div>
@@ -210,3 +240,41 @@
     </section>
   </div>
 </div>
+
+@if (classificando(); as c) {
+  <div class="modal-backdrop" (click)="classificando.set(null)">
+    <form class="modal" (click)="$event.stopPropagation()" (ngSubmit)="salvarClassificacao()">
+      <div class="modal-header">
+        <h3>Classificar documento</h3>
+        <p>{{ c.doc.filename }}. A mudança vale imediatamente na busca, sem reindexar.</p>
+      </div>
+      <div class="modal-body">
+        <div class="field">
+          <label>Coleção</label>
+          <select class="select" name="colecao" [(ngModel)]="c.form.colecao">
+            <option value="institucional">Institucional: evidências do curso</option>
+            <option value="normativa">Normativa: fontes dos requisitos</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Tipo de documento</label>
+          <select class="select" name="tipo" [(ngModel)]="c.form.tipo_documento">
+            <option [ngValue]="null">Não informado</option>
+            @for (tipo of tiposDe(c.form.colecao); track tipo) {
+              <option [ngValue]="tipo">{{ tipo }}</option>
+            }
+          </select>
+        </div>
+        <div class="field">
+          <label>Curso</label>
+          <input class="input" name="curso" [(ngModel)]="c.form.curso" placeholder="eng-producao-ead" />
+          <span class="hint">Deve coincidir com o curso informado no diagnóstico.</span>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn" (click)="classificando.set(null)">Cancelar</button>
+        <button type="submit" class="btn primary">Salvar</button>
+      </div>
+    </form>
+  </div>
+}

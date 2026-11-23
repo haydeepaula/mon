@@ -2,8 +2,8 @@ import { HttpEventType } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
-import { DocumentItem, DocumentStats, DocumentStatus, UploadItem } from '../../../core/models/api.models';
-import { AdminApi } from '../../../core/services/admin-api.service';
+import { Colecao, DocumentItem, DocumentStats, DocumentStatus, DocumentVocabulary, UploadItem } from '../../../core/models/api.models';
+import { AdminApi, DocumentClassification } from '../../../core/services/admin-api.service';
 import { apiErrorMessage } from '../../../core/services/api-error';
 import { ConfirmService } from '../../../core/services/confirm.service';
 import { DownloadService } from '../../../core/services/download.service';
@@ -57,6 +57,13 @@ export class DocumentsPage implements OnInit {
   protected readonly expandedId = signal<string | null>(null);
   protected query = '';
   protected statusFilter = '';
+  protected colecaoFilter = '';
+
+  // Classificação na base de conhecimento (coleções normativa e institucional).
+  protected readonly vocab = signal<DocumentVocabulary | null>(null);
+  protected readonly envio = signal<DocumentClassification>({ colecao: 'institucional', tipo_documento: null, curso: 'eng-producao-ead' });
+  protected readonly classificando = signal<{ doc: DocumentItem; form: DocumentClassification } | null>(null);
+  protected readonly colecaoLabels: Record<string, string> = { normativa: 'Normativa', institucional: 'Institucional' };
 
   protected readonly statusLabels = STATUS_LABELS;
   protected readonly uploadLabels = UPLOAD_LABELS;
@@ -77,13 +84,46 @@ export class DocumentsPage implements OnInit {
 
   ngOnInit(): void {
     this.refresh();
+    this.api.documentVocabulary().then((v) => this.vocab.set(v)).catch(() => undefined);
+  }
+
+  protected tiposDe(colecao: string): string[] {
+    return this.vocab()?.tipos_documento[colecao as Colecao] ?? [];
+  }
+
+  protected mudarEnvio(change: Partial<DocumentClassification>): void {
+    this.envio.update((atual) => {
+      const novo = { ...atual, ...change };
+      if (change.colecao && !this.tiposDe(change.colecao).includes(novo.tipo_documento ?? '')) novo.tipo_documento = null;
+      return novo;
+    });
+  }
+
+  protected abrirClassificacao(doc: DocumentItem, event: Event): void {
+    event.stopPropagation();
+    this.classificando.set({ doc, form: { colecao: doc.colecao, tipo_documento: doc.tipo_documento, curso: doc.curso } });
+  }
+
+  protected async salvarClassificacao(): Promise<void> {
+    const atual = this.classificando();
+    if (!atual) return;
+    const form = atual.form;
+    if (form.tipo_documento && !this.tiposDe(form.colecao).includes(form.tipo_documento)) form.tipo_documento = null;
+    try {
+      await this.api.classifyDocument(atual.doc.id, { ...form, curso: form.curso?.trim() || null });
+      this.classificando.set(null);
+      this.toast.success('Classificação atualizada (sem reindexar).');
+      this.refresh(false);
+    } catch (error) {
+      this.toast.error(apiErrorMessage(error));
+    }
   }
 
   async refresh(showLoading = true): Promise<void> {
     if (showLoading) this.loading.set(true);
     try {
       const [documents, stats] = await Promise.all([
-        this.api.documents(this.query, this.statusFilter),
+        this.api.documents(this.query, this.statusFilter, this.colecaoFilter),
         this.api.documentStats(),
       ]);
       this.documents.set(documents);
@@ -125,7 +165,8 @@ export class DocumentsPage implements OnInit {
     const update = (change: Partial<UploadTask>) =>
       this.uploads.update((list) => list.map((task) => (task.id === id ? { ...task, ...change } : task)));
 
-    this.api.upload(file).subscribe({
+    const envio = this.envio();
+    this.api.upload(file, { ...envio, curso: envio.curso?.trim() || null }).subscribe({
       next: (event) => {
         if (event.type === HttpEventType.UploadProgress && event.total) {
           update({ progress: event.loaded / event.total });

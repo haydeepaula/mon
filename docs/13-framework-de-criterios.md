@@ -76,3 +76,7 @@ Cada evidência (`Evidencia`) traz documento, versão e hash do arquivo, página
 
 A pontuação `score` é a do reranker quando ele está ligado e a similaridade de cosseno quando não está; por isso, não se comparam pontuações entre execuções com configurações diferentes.
 
+## 13.6 Telas
+
+- **Framework de critérios** (`/admin/framework`): seleção da versão, mudança de status (enviar para validação, validar, arquivar), ativação, criação de nova versão por clonagem, importação e exportação em JSON e CSV. A lista de requisitos tem filtros por tipo, revisão e texto; o painel lateral mostra todos os campos e permite editar (versões em rascunho ou em validação), aprovar ou pedir ajuste com comentário, e **testar a recuperação** de evidências do requisito para um curso, o que ajuda a calibrar a consulta padronizada e os termos-chave antes do diagnóstico.
+- **Documentos** (`/admin/documentos`): a barra acima da área de envio define a coleção, o tipo e o curso dos próximos uploads; cada documento mostra sua classificação e pode ser reclassificado sem reindexar; a lista filtra por coleção.
