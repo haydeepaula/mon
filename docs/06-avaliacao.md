@@ -82,3 +82,21 @@ Também são registradas a **latência média** e o **percentil 95** da latênci
 2. Executar a avaliação com a configuração padrão (linha de base).
 3. Variar um fator por vez — rerank ligado/desligado, top-n, tamanho de chunk (reindexando), modelo — e comparar.
 4. Reportar as métricas médias, a latência e exemplos qualitativos (acertos e falhas).
+
+## 6.7 Concordância diagnóstica (nível 2 da seção 3.8 do TCC)
+
+O módulo de diagnóstico ([14. Diagnóstico](14-diagnostico.md)) mede a concordância entre a classificação proposta pelo protótipo e a decisão final do consultor (`backend/app/domain/concordancia.py`):
+
+| Métrica | Definição |
+|---|---|
+| Percentual de acordo | Fração dos itens em que proposta e decisão coincidem |
+| Kappa de Cohen (κ) | (pₒ − pₑ) / (1 − pₑ), sobre as quatro categorias C, PC, NC e EI (COHEN, 1960). Interpretado pelas faixas de Landis e Koch (1977) |
+| Kappa ponderado quadrático | Concordância no conceito INEP de 1 a 5, penalizando mais as diferenças maiores (COHEN, 1968) |
+| Matriz de confusão | Linhas: proposta; colunas: decisão do consultor |
+| Divergências por causa | Recuperação, OCR, divisão em trechos, geração ou interpretação, atribuídas pelo consultor |
+| Acordo por tipo de requisito | Legal, qualidade e competência |
+
+Itens cuja proposta falhou (erro do provedor) ficam fora do κ, mas aparecem na contagem de erros. As métricas são recalculadas a cada validação e ficam em `diagnosticos.metricas`; `GET /api/diagnosticos/{id}/metricas?referencia={id}` compara as propostas de um diagnóstico com as decisões registradas em outro, o que permite repetir a verificação com outra configuração (modelo, rerank, top-n) sem pedir nova validação ao consultor.
+
+A **validação cega** (opção do plano de diagnóstico) esconde a proposta até o consultor registrar sua classificação, reduzindo o viés de ancoragem que inflaria o κ.
+

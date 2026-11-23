@@ -42,6 +42,8 @@ class Settings(BaseSettings):
     system_prompt_file: Path = Path("/app/SYSTEM_PROMPT.md")
     # Framework de critérios carregado na primeira inicialização (TCC, seção 3.5).
     framework_seed_file: Path = Path("/data/framework/framework-v0.1.json")
+    # Instrução de sistema da verificação assistida (TCC, seção 3.6.1 e).
+    diagnostico_prompt_file: Path = Path("/app/DIAGNOSTICO_PROMPT.md")
 
     ocr_languages: str = "por+eng"
     ocr_dpi: int = 300

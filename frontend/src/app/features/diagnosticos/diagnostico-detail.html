@@ -1,0 +1,426 @@
+<div class="page">
+  <div class="page-inner">
+    @if (diagnostico(); as d) {
+      <header class="head">
+        <div class="row">
+          <button class="btn sm ghost" (click)="voltar()"><app-icon name="chevron-left" [size]="15" /> Diagnósticos</button>
+          <h1 class="grow truncate">{{ d.nome }}</h1>
+          <span class="badge" [class]="statusInfo[d.status].tone">
+            @if (d.status === 'verificando') {
+              <span class="spinner small"></span>
+            }
+            {{ statusInfo[d.status].label }}
+          </span>
+        </div>
+        <div class="chips">
+          <span class="chip">{{ d.curso_nome || d.curso || 'Curso não informado' }}</span>
+          <span class="chip">Framework v{{ d.framework_versao }}</span>
+          @if (d.escopo.formato_oferta) {
+            <span class="chip">{{ d.escopo.formato_oferta }}</span>
+          }
+          @if (d.escopo.validacao_cega) {
+            <span class="chip accent"><app-icon name="eye" [size]="12" /> validação cega</span>
+          }
+          @if (execucao(); as e) {
+            <span class="chip">LLM: {{ e['llm_model'] }}</span>
+          }
+        </div>
+        <div class="actions">
+          <button class="btn" (click)="carregar()"><app-icon name="refresh" [size]="15" /> Atualizar</button>
+          @if (podeVerificar()) {
+            <button class="btn primary" (click)="verificar()">
+              <app-icon name="play" [size]="14" />
+              {{ d.status === 'planejamento' ? 'Executar verificação assistida' : 'Verificar itens pendentes' }}
+            </button>
+          }
+        </div>
+      </header>
+
+      <ol class="stepper">
+        @for (etapa of etapas; track etapa.label; let i = $index) {
+          <li [class.done]="i < etapaAtual()" [class.current]="i === etapaAtual()">{{ etapa.label }}</li>
+        }
+      </ol>
+
+      @if (d.status === 'verificando') {
+        <div class="card verificando">
+          <div class="row">
+            <span class="spinner"></span>
+            <span class="grow">
+              Verificação assistida em andamento: {{ d.resumo.propostas['gerada'] ?? 0 }} de {{ d.resumo.total }} propostas
+              geradas{{ d.resumo.propostas['erro'] ? ', ' + d.resumo.propostas['erro'] + ' com erro' : '' }}.
+            </span>
+          </div>
+          <div class="progress"><span [style.width.%]="((d.resumo.propostas['gerada'] ?? 0) / d.resumo.total) * 100"></span></div>
+        </div>
+      }
+
+      <div class="summary">
+        @for (c of classificacoes; track c.value) {
+          <div class="sum-card" [class]="c.tone">
+            <div class="sum-value">{{ contagem(c.value) }}</div>
+            <div class="sum-label">{{ c.label }}</div>
+          </div>
+        }
+        <div class="sum-card">
+          <div class="sum-value">{{ d.resumo.validados }}/{{ d.resumo.total }}</div>
+          <div class="sum-label">Validados</div>
+        </div>
+      </div>
+
+      <div class="tabs">
+        <button [class.active]="aba() === 'revisao'" (click)="abrirAba('revisao')">Verificação e validação</button>
+        <button [class.active]="aba() === 'concordancia'" (click)="abrirAba('concordancia')">Concordância</button>
+        <button [class.active]="aba() === 'plano'" (click)="abrirAba('plano')">Plano e reprodutibilidade</button>
+      </div>
+
+      @switch (aba()) {
+        @case ('revisao') {
+          <div class="review">
+            <section class="card list">
+              <div class="filters">
+                <select class="select sm" [ngModel]="filtro()" (ngModelChange)="filtro.set($event)">
+                  <option value="todos">Todos ({{ itens().length }})</option>
+                  <option value="a_validar">A validar</option>
+                  <option value="divergentes">Divergentes</option>
+                  <option value="nc_pc">NC e PC</option>
+                  <option value="erros">Com erro</option>
+                </select>
+              </div>
+              <div class="items">
+                @for (item of itensFiltrados(); track item.id) {
+                  <button class="item" [class.active]="item.id === selecionadoId()" (click)="selecionar(item)">
+                    <div class="item-top">
+                      <span class="mono code">{{ item.requisito_codigo }}</span>
+                      <span class="grow"></span>
+                      @if (item.proposta_status === 'pendente') {
+                        <span class="badge">pendente</span>
+                      } @else if (item.proposta_status === 'erro') {
+                        <span class="badge danger">erro</span>
+                      } @else if (item.proposta_oculta) {
+                        <span class="badge"><app-icon name="eye" [size]="11" /></span>
+                      } @else if (item.classificacao_proposta) {
+                        <span class="badge outline" [class]="classInfo[item.classificacao_proposta].tone" title="Proposta do Mon">
+                          {{ item.classificacao_proposta }}
+                        </span>
+                      }
+                      <app-icon name="chevron-right" [size]="12" class="muted" />
+                      @if (item.classificacao_final) {
+                        <span class="badge" [class]="classInfo[item.classificacao_final].tone" title="Decisão do consultor">
+                          {{ item.classificacao_final }}
+                        </span>
+                      } @else {
+                        <span class="badge">?</span>
+                      }
+                    </div>
+                    <div class="item-text">{{ item.requisito.texto }}</div>
+                  </button>
+                } @empty {
+                  <div class="empty">Nenhum item neste filtro.</div>
+                }
+              </div>
+            </section>
+
+            <section class="card detail">
+              @if (selecionado(); as item) {
+                <div class="detail-head">
+                  <div class="row">
+                    <span class="mono code big">{{ item.requisito_codigo }}</span>
+                    <span class="chip">{{ tipoInfo[item.requisito.tipo] }}</span>
+                    @if (item.requisito.dimensao_inep) {
+                      <span class="chip">Dimensão {{ item.requisito.dimensao_inep }}</span>
+                    }
+                  </div>
+                  <p class="req-text">{{ item.requisito.texto }}</p>
+                  <div class="meta">
+                    <div><strong>Fonte:</strong> {{ item.requisito.fonte_documento }}{{ item.requisito.fonte_dispositivo ? ', ' + item.requisito.fonte_dispositivo : '' }}</div>
+                    <div><strong>Evidência esperada:</strong> {{ item.requisito.evidencia_esperada }}</div>
+                  </div>
+                </div>
+
+                @if (item.proposta_status === 'erro') {
+                  <div class="alert danger">
+                    <app-icon name="alert" [size]="15" />
+                    <div class="grow">
+                      <strong>Falha ao gerar a proposta.</strong>
+                      <div class="mono small">{{ item.erro }}</div>
+                    </div>
+                    @if (!item.classificacao_final && d.status !== 'verificando') {
+                      <button class="btn sm" (click)="verificar([item.id])">Reverificar</button>
+                    }
+                  </div>
+                }
+
+                @if (item.proposta_status === 'gerada') {
+                  @if (item.proposta_oculta) {
+                    <div class="alert info">
+                      <app-icon name="eye" [size]="15" />
+                      <span>Validação cega: registre sua classificação a partir das evidências. A proposta do Mon aparece depois.</span>
+                    </div>
+                  } @else if (item.proposta; as p) {
+                    <div class="proposta">
+                      <div class="row">
+                        <span class="label">Proposta do Mon</span>
+                        <span class="badge" [class]="classInfo[p.classificacao].tone">{{ p.classificacao }} · {{ classInfo[p.classificacao].label }}</span>
+                        @if (p.conceito_inep) {
+                          <span class="chip">conceito {{ p.conceito_inep }}</span>
+                        }
+                        @if (p.classificacao_original) {
+                          <span class="chip warn">LLM propôs {{ p.classificacao_original }}</span>
+                        }
+                        <span class="grow"></span>
+                        <span class="muted small">{{ (item.latencia_ms / 1000).toFixed(1) }}s</span>
+                      </div>
+                      <p class="justificativa">{{ p.justificativa }}</p>
+                      @if (p.lacunas.length) {
+                        <div class="lacunas">
+                          <strong>Lacunas:</strong>
+                          <ul>
+                            @for (l of p.lacunas; track $index) {
+                              <li>{{ l }}</li>
+                            }
+                          </ul>
+                        </div>
+                      }
+                      @for (a of item.alertas; track a) {
+                        <div class="alerta"><app-icon name="info" [size]="13" /> {{ alertas[a] || a }}</div>
+                      }
+                    </div>
+                  }
+                }
+
+                <div class="section-title">
+                  Evidências recuperadas ({{ item.evidencias.length }})
+                  @if (item.consulta) {
+                    <span class="muted small" [title]="item.consulta">· consulta: {{ item.consulta }}</span>
+                  }
+                </div>
+                <div class="evidences">
+                  @for (e of item.evidencias; track e.chunk_id) {
+                    <article class="evidence" [class.cited]="citada(item, e)">
+                      <header class="row">
+                        <span class="n">[{{ e.n }}]</span>
+                        <span class="grow truncate" [title]="e.localizacao || e.documento">{{ e.localizacao || e.documento }}</span>
+                        @if (e.ocr) {
+                          <span class="chip warn">OCR</span>
+                        }
+                        @if (e.score != null) {
+                          <span class="muted small">{{ e.score | percent100 }}</span>
+                        }
+                        @if (e.document_id) {
+                          <button class="btn sm ghost icon" title="Baixar documento" (click)="baixar(e)"><app-icon name="download" [size]="13" /></button>
+                        }
+                      </header>
+                      <p>{{ e.trecho }}</p>
+                    </article>
+                  } @empty {
+                    <div class="empty small">Nenhuma evidência recuperada nos documentos institucionais.</div>
+                  }
+                </div>
+
+                @if (item.normativos.length) {
+                  <button class="btn sm ghost" (click)="mostrarNormativos.set(!mostrarNormativos())">
+                    <app-icon [name]="mostrarNormativos() ? 'chevron-down' : 'chevron-right'" [size]="13" />
+                    Texto normativo de origem ({{ item.normativos.length }})
+                  </button>
+                  @if (mostrarNormativos()) {
+                    <div class="evidences">
+                      @for (e of item.normativos; track e.chunk_id) {
+                        <article class="evidence normativo">
+                          <header class="row"><span class="grow truncate">{{ e.localizacao || e.documento }}</span></header>
+                          <p>{{ e.trecho }}</p>
+                        </article>
+                      }
+                    </div>
+                  }
+                }
+
+                @if (validacao(); as form) {
+                  @if (form.itemId === item.id && item.proposta_status !== 'pendente') {
+                    <form class="validation" (ngSubmit)="salvar(item, form, true)">
+                      <div class="section-title">
+                        Decisão do consultor
+                        @if (item.validado_em) {
+                          <span class="muted small">· registrada em {{ item.validado_em | dateTime }}</span>
+                        }
+                      </div>
+                      <div class="choices">
+                        @for (c of classificacoes; track c.value) {
+                          <button type="button" class="choice" [class]="c.tone" [class.on]="form.classificacao_final === c.value"
+                            [disabled]="!podeValidar()" (click)="escolher(form, c.value)">
+                            <strong>{{ c.value }}</strong> {{ c.label }}
+                          </button>
+                        }
+                      </div>
+                      @if (item.requisito.tipo === 'qualidade') {
+                        <div class="field inline">
+                          <label>Conceito estimado (1 a 5)</label>
+                          <select class="select sm" name="conceito" [(ngModel)]="form.conceito_final" [disabled]="!podeValidar()">
+                            <option [ngValue]="null">—</option>
+                            @for (n of [1, 2, 3, 4, 5]; track n) {
+                              <option [ngValue]="n">{{ n }}</option>
+                            }
+                          </select>
+                        </div>
+                      }
+                      @if (exigeCausa(item, form)) {
+                        <div class="field">
+                          <label>Causa da divergência</label>
+                          <div class="choices small">
+                            @for (c of causas; track c.value) {
+                              <button type="button" class="choice" [class.on]="form.divergencia_causa === c.value" [title]="c.hint"
+                                [disabled]="!podeValidar()" (click)="escolherCausa(form, c.value)">
+                                {{ c.label }}
+                              </button>
+                            }
+                          </div>
+                        </div>
+                      }
+                      <div class="field">
+                        <label>Comentário</label>
+                        <textarea class="textarea" name="comentario" rows="2" [(ngModel)]="form.comentario" [disabled]="!podeValidar()"></textarea>
+                      </div>
+                      <div class="row end">
+                        @if (!podeValidar()) {
+                          <span class="muted small grow">A validação fica disponível após a verificação e até a emissão do relatório.</span>
+                        }
+                        <button type="button" class="btn" [disabled]="salvando() || !podeValidar()" (click)="salvar(item, form, false)">Salvar</button>
+                        <button type="submit" class="btn primary" [disabled]="salvando() || !podeValidar()">
+                          <app-icon name="check" [size]="14" /> Salvar e próximo
+                        </button>
+                      </div>
+                    </form>
+                  }
+                }
+              } @else {
+                <div class="empty">Selecione um requisito.</div>
+              }
+            </section>
+          </div>
+        }
+
+        @case ('concordancia') {
+          @if (metricas(); as m) {
+            <div class="metric-cards">
+              <div class="metric">
+                <div class="metric-label">Itens comparados</div>
+                <div class="metric-value">{{ m.n_pares }}</div>
+                <div class="metric-sub">{{ m.n_validados }} validados de {{ m.n_itens }}</div>
+              </div>
+              <div class="metric" [class]="tomKappa(m.percentual_acordo)">
+                <div class="metric-label">Percentual de acordo</div>
+                <div class="metric-value">{{ m.percentual_acordo | percent100: 1 }}</div>
+              </div>
+              <div class="metric" [class]="tomKappa(m.kappa)">
+                <div class="metric-label">Kappa de Cohen</div>
+                <div class="metric-value">{{ m.kappa != null ? m.kappa.toFixed(3) : '—' }}</div>
+                <div class="metric-sub">{{ m.kappa_interpretacao ? 'concordância ' + m.kappa_interpretacao : '' }}</div>
+              </div>
+              <div class="metric" [class]="tomKappa(m.kappa_ponderado_conceito)">
+                <div class="metric-label">κ ponderado (conceito INEP)</div>
+                <div class="metric-value">{{ m.kappa_ponderado_conceito != null ? m.kappa_ponderado_conceito.toFixed(3) : '—' }}</div>
+                <div class="metric-sub">{{ m.n_pares_conceito }} pares</div>
+              </div>
+              <div class="metric">
+                <div class="metric-label">Sem evidência / erros</div>
+                <div class="metric-value">{{ m.n_sem_evidencia }} / {{ m.n_erros }}</div>
+                <div class="metric-sub">latência média {{ m.latencia_media_ms ? (m.latencia_media_ms / 1000).toFixed(1) + 's' : '—' }}</div>
+              </div>
+            </div>
+
+            <div class="grid-2">
+              <div class="card">
+                <div class="card-header"><div><h3>Matriz de confusão</h3><p>Linhas: proposta do Mon. Colunas: decisão do consultor.</p></div></div>
+                <div class="table-wrap">
+                  <table class="table matrix">
+                    <thead>
+                      <tr>
+                        <th></th>
+                        @for (c of categorias; track c) {
+                          <th class="num">{{ c }}</th>
+                        }
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (linha of categorias; track linha) {
+                        <tr>
+                          <th>{{ linha }}</th>
+                          @for (coluna of categorias; track coluna) {
+                            <td class="num" [class.diag]="linha === coluna" [class.zero]="!m.matriz_confusao[linha][coluna]">
+                              {{ m.matriz_confusao[linha][coluna] }}
+                            </td>
+                          }
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-header"><div><h3>Divergências por causa</h3><p>Atribuídas pelo consultor na validação.</p></div></div>
+                <div class="card-body">
+                  @for (par of entradas(m.divergencias_por_causa); track par[0]) {
+                    <div class="bar-row">
+                      <span class="bar-label">{{ causaLabel(par[0]) }}</span>
+                      <div class="bar"><span [style.width.%]="(par[1] / (m.n_pares || 1)) * 100"></span></div>
+                      <span class="num">{{ par[1] }}</span>
+                    </div>
+                  } @empty {
+                    <div class="muted">Nenhuma divergência registrada.</div>
+                  }
+                  <div class="section-title spaced">Acordo por tipo de requisito</div>
+                  @for (par of entradas(m.por_tipo); track par[0]) {
+                    <div class="bar-row">
+                      <span class="bar-label">{{ tipoLabel(par[0]) }}</span>
+                      <div class="bar"><span [style.width.%]="($any(par[1]).percentual_acordo ?? 0) * 100"></span></div>
+                      <span class="num">{{ $any(par[1]).percentual_acordo | percent100 }} (n={{ $any(par[1]).n }})</span>
+                    </div>
+                  }
+                </div>
+              </div>
+            </div>
+          } @else {
+            <div class="empty"><span class="spinner"></span></div>
+          }
+        }
+
+        @case ('plano') {
+          <div class="grid-2">
+            <div class="card">
+              <div class="card-header"><div><h3>Plano de diagnóstico</h3><p>Etapa 1 do Quadro 9.</p></div></div>
+              <div class="card-body kv">
+                <div><span>Formato de oferta</span><strong>{{ d.escopo.formato_oferta || 'todos' }}</strong></div>
+                <div><span>Próximo ato</span><strong>{{ d.escopo.proximo_ato || '—' }}{{ d.escopo.data_ato ? ' (' + d.escopo.data_ato + ')' : '' }}</strong></div>
+                <div><span>Tipos de requisito</span><strong>{{ d.escopo.tipos.length ? d.escopo.tipos.join(', ') : 'todos' }}</strong></div>
+                <div><span>Normas em tramitação</span><strong>{{ d.escopo.incluir_tendencia ? 'incluídas' : 'excluídas' }}</strong></div>
+                <div><span>Validação cega</span><strong>{{ d.escopo.validacao_cega ? 'sim' : 'não' }}</strong></div>
+                <div><span>Requisitos</span><strong>{{ d.resumo.total }}</strong></div>
+                @if (d.escopo.observacoes) {
+                  <div class="block"><span>Observações</span><p>{{ d.escopo.observacoes }}</p></div>
+                }
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-header"><div><h3>Reprodutibilidade</h3><p>Configuração registrada na última verificação (seção 3.8).</p></div></div>
+              <div class="card-body kv">
+                @if (execucao(); as e) {
+                  <div><span>Executado em</span><strong>{{ $any(e['executado_em']) | dateTime }}</strong></div>
+                  <div><span>Modelo</span><strong>{{ e['llm_provider'] }} / {{ e['llm_model'] }} ({{ e['reasoning_level'] }})</strong></div>
+                  <div><span>Recuperação</span><strong>top-k {{ e['retrieval_top_k'] }} → top-n {{ e['rerank_top_n'] }}</strong></div>
+                  <div><span>Rerank</span><strong>{{ e['rerank_model'] || 'desligado' }}</strong></div>
+                  <div><span>Chunks</span><strong>{{ e['chunk_size'] }} / {{ e['chunk_overlap'] }}</strong></div>
+                  <div><span>Instrução de sistema</span><strong class="mono">{{ $any(e['prompt_sha256'])?.slice(0, 12) }}…</strong></div>
+                  <div><span>Framework</span><strong>v{{ d.framework_versao }} ({{ d.config['framework_status'] }})</strong></div>
+                } @else {
+                  <div class="muted">A verificação ainda não foi executada.</div>
+                }
+              </div>
+            </div>
+          </div>
+        }
+      }
+    } @else {
+      <div class="empty"><span class="spinner"></span></div>
+    }
+  </div>
+</div>

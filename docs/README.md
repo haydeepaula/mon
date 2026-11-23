@@ -13,3 +13,4 @@
 11. [Metodologia](11-metodologia.md): passo a passo do desenvolvimento, base para o capítulo de metodologia do TCC.
 12. [Plano de diagnóstico](12-plano-diagnostico.md): expansão para o framework de critérios e o método de consultoria do TCC.
 13. [Framework de critérios](13-framework-de-criterios.md): requisitos, versões, validação pelo orientador, importação e exportação.
+14. [Diagnóstico](14-diagnostico.md): processo do Quadro 9, verificação assistida, validação, priorização GUT, relatório e concordância.

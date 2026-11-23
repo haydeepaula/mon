@@ -5,13 +5,17 @@ from abc import ABC, abstractmethod
 
 from sqlalchemy.orm import Session
 
-from app.container import build_chunker, get_embedder, get_loader_factory, get_vector_store
+from app.container import build_chunker, get_embedder, get_llm_factory, get_loader_factory, get_vector_store
 from app.core.config import get_settings
 from app.core.exceptions import MonError
-from app.db.models import JobType
+from app.db.models import Diagnostico, JobType
+from app.domain.diagnostico import DiagnosticoStatus
 from app.repositories.document_repository import DocumentRepository
+from app.services.diagnostico.prompt import carregar_instrucao
+from app.services.diagnostico.verificacao_service import VerificacaoService
 from app.services.eval_service import EvalService
 from app.services.folder_sync_service import FolderSyncService
+from app.services.framework.evidence_retrieval_service import EvidenceRetrievalService
 from app.services.ingestion_service import IngestionService
 from app.services.job_service import JobService
 from app.services.progress import ProgressReporter
@@ -76,6 +80,36 @@ class EvalGenerateHandler(JobHandler):
         return EvalService(session).generate_cases(int(payload.get("count", 10)), reporter)
 
 
+class DiagnosticoVerificarHandler(JobHandler):
+    """Etapa 4 do Quadro 9: verificação assistida dos requisitos de um diagnóstico."""
+
+    job_type = JobType.DIAGNOSTICO_VERIFICAR
+
+    def handle(self, session, payload, reporter, created_by):
+        diagnostico_id = uuid.UUID(payload["diagnostico_id"])
+        diagnostico = session.get(Diagnostico, diagnostico_id)
+        if diagnostico is None:
+            raise MonError("Diagnóstico não encontrado.")
+        rag = SettingsService(session).get_rag()
+        # Usa o modelo registrado ao enfileirar, mesmo que a configuração mude no intervalo.
+        execucao = (diagnostico.config or {}).get("ultima_execucao", {})
+        try:
+            llm = get_llm_factory().create(
+                execucao.get("llm_provider", rag.llm_provider),
+                execucao.get("llm_model", rag.llm_model),
+                execucao.get("reasoning_level", rag.reasoning_level),
+            )
+            retrieval = EvidenceRetrievalService.from_settings(session, rag)
+        except Exception:
+            diagnostico.status = DiagnosticoStatus.FALHOU
+            session.commit()
+            raise
+        service = VerificacaoService(
+            session, retrieval, llm, carregar_instrucao(get_settings().diagnostico_prompt_file)
+        )
+        return service.executar(diagnostico_id, payload.get("item_ids"), reporter)
+
+
 def default_handlers() -> dict[str, JobHandler]:
     handlers = [
         IngestDocumentHandler(),
@@ -83,5 +117,6 @@ def default_handlers() -> dict[str, JobHandler]:
         ReindexAllHandler(),
         EvalRunHandler(),
         EvalGenerateHandler(),
+        DiagnosticoVerificarHandler(),
     ]
     return {handler.job_type.value: handler for handler in handlers}

@@ -1,0 +1,182 @@
+<div class="page">
+  <div class="page-inner">
+    <header class="page-header">
+      <div>
+        <div class="eyebrow">Consultoria</div>
+        <h1>Diagnósticos</h1>
+        <p>
+          Cada diagnóstico confronta os documentos do curso com os requisitos do framework. O Mon propõe uma
+          classificação para cada requisito, com as evidências citadas, e o consultor valida, prioriza e emite o
+          relatório.
+        </p>
+      </div>
+      <div class="actions">
+        <button class="btn" (click)="refresh()"><app-icon name="refresh" [size]="16" /> Atualizar</button>
+        <button class="btn primary" (click)="novo()"><app-icon name="plus" [size]="16" /> Novo diagnóstico</button>
+      </div>
+    </header>
+
+    <div class="card">
+      @if (loading()) {
+        <div class="empty"><span class="spinner"></span></div>
+      } @else if (!diagnosticos().length) {
+        <div class="empty">
+          <strong>Nenhum diagnóstico ainda</strong>
+          Indexe os documentos do curso na coleção institucional e crie o primeiro diagnóstico.
+        </div>
+      } @else {
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Diagnóstico</th>
+                <th>Curso</th>
+                <th>Framework</th>
+                <th>Etapa</th>
+                <th>Validação</th>
+                <th class="num">κ</th>
+                <th>Criado em</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (d of diagnosticos(); track d.id) {
+                <tr class="clickable" (click)="abrir(d)">
+                  <td class="strong">{{ d.nome }}</td>
+                  <td class="muted">{{ d.curso_nome || d.curso || '—' }}</td>
+                  <td><span class="chip">v{{ d.framework_versao }}</span></td>
+                  <td>
+                    <span class="badge" [class]="statusInfo[d.status].tone">
+                      @if (d.status === 'verificando') {
+                        <span class="spinner small"></span>
+                      }
+                      {{ statusInfo[d.status].label }}
+                    </span>
+                  </td>
+                  <td class="progress-cell">
+                    <div class="progress"><span [style.width.%]="progresso(d) * 100"></span></div>
+                    <span class="muted">{{ d.resumo.validados }}/{{ d.resumo.total }}</span>
+                  </td>
+                  <td class="num">{{ d.metricas.kappa != null ? d.metricas.kappa!.toFixed(2) : '—' }}</td>
+                  <td class="muted">{{ d.created_at | dateTime }}</td>
+                  <td class="num">
+                    <button class="btn sm ghost icon" title="Excluir" (click)="excluir(d, $event)">
+                      <app-icon name="trash" [size]="15" />
+                    </button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+  </div>
+</div>
+
+@if (form(); as f) {
+  <div class="modal-backdrop" (click)="form.set(null)">
+    <form class="modal wide" (click)="$event.stopPropagation()" (ngSubmit)="criar(f)">
+      <div class="modal-header">
+        <h3>Novo diagnóstico</h3>
+        <p>Etapa 1 do processo: defina o escopo e os requisitos aplicáveis.</p>
+      </div>
+      <div class="modal-body">
+        <div class="field">
+          <label>Nome</label>
+          <input class="input" name="nome" [(ngModel)]="f.nome" placeholder="Ex.: Diagnóstico 2026.2 — transição semipresencial" />
+        </div>
+        <div class="grid-2">
+          <div class="field">
+            <label>Curso (identificador)</label>
+            <input class="input mono" name="curso" [(ngModel)]="f.curso" />
+            <span class="hint">Deve coincidir com o campo "curso" dos documentos institucionais.</span>
+          </div>
+          <div class="field">
+            <label>Nome do curso</label>
+            <input class="input" name="curso_nome" [(ngModel)]="f.curso_nome" />
+          </div>
+        </div>
+        <div class="grid-3">
+          <div class="field">
+            <label>Versão do framework</label>
+            <select class="select" name="versao" [(ngModel)]="f.framework_versao" (ngModelChange)="previa()">
+              @for (v of versoes(); track v.id) {
+                <option [value]="v.versao">v{{ v.versao }} ({{ v.status }}){{ v.ativa ? ' — ativa' : '' }}</option>
+              }
+            </select>
+          </div>
+          <div class="field">
+            <label>Formato de oferta</label>
+            <select class="select" name="formato" [(ngModel)]="f.escopo.formato_oferta" (ngModelChange)="previa()">
+              <option [ngValue]="null">Todos</option>
+              @for (fmt of formatos; track fmt.value) {
+                <option [ngValue]="fmt.value">{{ fmt.label }}</option>
+              }
+            </select>
+          </div>
+          <div class="field">
+            <label>Próximo ato regulatório</label>
+            <select class="select" name="ato" [(ngModel)]="f.escopo.proximo_ato">
+              <option [ngValue]="null">Não informado</option>
+              <option value="autorizacao">Autorização</option>
+              <option value="reconhecimento">Reconhecimento</option>
+              <option value="renovacao">Renovação de reconhecimento</option>
+              <option value="outro">Outro</option>
+            </select>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="field">
+            <label>Data prevista do ato</label>
+            <input class="input" type="date" name="data_ato" [(ngModel)]="f.escopo.data_ato" />
+            <span class="hint">Usada para sugerir a urgência na matriz GUT.</span>
+          </div>
+          <div class="field">
+            <label>Tipos de requisito</label>
+            <div class="chips">
+              @for (t of tipos; track t[0]) {
+                <button type="button" class="chip toggle" [class.on]="f.escopo.tipos.includes(t[0])" (click)="toggleTipo(f, t[0])">
+                  {{ t[1] }}
+                </button>
+              }
+            </div>
+            <span class="hint">Nenhum selecionado = todos.</span>
+          </div>
+        </div>
+        <div class="switches">
+          <label class="switch">
+            <input type="checkbox" name="tendencia" [(ngModel)]="f.escopo.incluir_tendencia" (ngModelChange)="previa()" />
+            Incluir normas em tramitação (tendência)
+          </label>
+          <label class="switch">
+            <input type="checkbox" name="cega" [(ngModel)]="f.escopo.validacao_cega" />
+            Validação cega (o consultor decide antes de ver a proposta)
+          </label>
+          <label class="switch">
+            <input type="checkbox" name="normativa" [(ngModel)]="f.escopo.incluir_normativa" />
+            Mostrar o texto normativo de origem junto às evidências
+          </label>
+        </div>
+        <div class="field">
+          <label>Observações do plano</label>
+          <textarea class="textarea" name="obs" rows="2" [(ngModel)]="f.escopo.observacoes"></textarea>
+        </div>
+        <div class="previa" [class.vazia]="aplicaveis() === 0">
+          <app-icon name="list" [size]="16" />
+          @if (aplicaveis() === null) {
+            Calculando requisitos aplicáveis…
+          } @else {
+            <strong>{{ aplicaveis() }}</strong> requisito(s) do framework se aplicam a este escopo.
+          }
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn" (click)="form.set(null)">Cancelar</button>
+        <button type="submit" class="btn primary" [disabled]="saving() || !aplicaveis()">
+          <app-icon name="check" [size]="14" /> Criar diagnóstico
+        </button>
+      </div>
+    </form>
+  </div>
+}

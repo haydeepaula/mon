@@ -52,6 +52,7 @@ class JobType(StrEnum):
     REINDEX_ALL = "reindex_all"
     EVAL_RUN = "eval_run"
     EVAL_GENERATE = "eval_generate"
+    DIAGNOSTICO_VERIFICAR = "diagnostico_verificar"
 
 
 class JobStatus(StrEnum):
@@ -276,3 +277,87 @@ class RequisitoModel(TimestampMixin, Base):
     ordem: Mapped[int] = mapped_column(Integer, default=0)
 
     framework: Mapped[FrameworkVersao] = relationship(back_populates="requisitos")
+
+
+class Diagnostico(TimestampMixin, Base):
+    """Execução do processo de diagnóstico para um curso (TCC, seção 3.7, Quadro 9)."""
+
+    __tablename__ = "diagnosticos"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    nome: Mapped[str] = mapped_column(String(200))
+    curso: Mapped[str | None] = mapped_column(String(80), nullable=True, index=True)
+    curso_nome: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # Plano de diagnóstico (etapa 1): formato de oferta, próximo ato regulatório, filtros...
+    escopo: Mapped[dict] = mapped_column(JsonType, default=dict)
+    framework_versao: Mapped[str] = mapped_column(String(40))
+    # Reprodutibilidade (seção 3.8): modelo, provedor, parâmetros, hash do prompt, base indexada.
+    config: Mapped[dict] = mapped_column(JsonType, default=dict)
+    status: Mapped[str] = mapped_column(String(30), default="planejamento", index=True)
+    job_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
+    metricas: Mapped[dict] = mapped_column(JsonType, default=dict)
+    relatorio_md: Mapped[str | None] = mapped_column(Text, nullable=True)
+    relatorio_emitido_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    devolutiva: Mapped[dict] = mapped_column(JsonType, default=dict)
+    # Diagnóstico de referência (decisões do consultor) quando este é uma variação de configuração.
+    referencia_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("diagnosticos.id", ondelete="SET NULL"), nullable=True
+    )
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+
+    itens: Mapped[list["DiagnosticoItem"]] = relationship(
+        back_populates="diagnostico",
+        cascade="all, delete-orphan",
+        order_by=lambda: [DiagnosticoItem.ordem, DiagnosticoItem.requisito_codigo],
+    )
+
+
+class DiagnosticoItem(Base):
+    """Um requisito no diagnóstico: proposta do protótipo, decisão do consultor e priorização.
+
+    A proposta nunca é sobrescrita pela validação (TCC, seção 3.6.1 d).
+    """
+
+    __tablename__ = "diagnostico_itens"
+    __table_args__ = (UniqueConstraint("diagnostico_id", "requisito_codigo", name="uq_item_diagnostico_requisito"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    diagnostico_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("diagnosticos.id", ondelete="CASCADE"), index=True)
+    requisito_codigo: Mapped[str] = mapped_column(String(40))
+    # Cópia do requisito no momento da criação: o framework pode mudar depois.
+    requisito: Mapped[dict] = mapped_column(JsonType, default=dict)
+    ordem: Mapped[int] = mapped_column(Integer, default=0)
+
+    # Etapa 4: verificação assistida.
+    consulta: Mapped[str | None] = mapped_column(Text, nullable=True)
+    evidencias: Mapped[list] = mapped_column(JsonType, default=list)
+    normativos: Mapped[list] = mapped_column(JsonType, default=list)
+    proposta: Mapped[dict] = mapped_column(JsonType, default=dict)
+    resposta_bruta: Mapped[str | None] = mapped_column(Text, nullable=True)
+    classificacao_proposta: Mapped[str | None] = mapped_column(String(4), nullable=True)
+    conceito_proposto: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    proposta_status: Mapped[str] = mapped_column(String(20), default="pendente")
+    alertas: Mapped[list] = mapped_column(JsonType, default=list)
+    erro: Mapped[str | None] = mapped_column(Text, nullable=True)
+    latencia_ms: Mapped[int] = mapped_column(Integer, default=0)
+    gerado_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # Etapa 5: validação pelo consultor.
+    classificacao_final: Mapped[str | None] = mapped_column(String(4), nullable=True)
+    conceito_final: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    divergencia_causa: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    comentario: Mapped[str | None] = mapped_column(Text, nullable=True)
+    validado_por: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    validado_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # Etapa 6: priorização GUT (apenas itens NC e PC).
+    gut_g: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    gut_u: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    gut_t: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    gut_sugestao: Mapped[dict] = mapped_column(JsonType, default=dict)
+    prioridade: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    diagnostico: Mapped[Diagnostico] = relationship(back_populates="itens")
+

@@ -15,6 +15,7 @@ interface ConversationGroup {
 }
 
 const ADMIN_LINKS = [
+  { path: '/admin/diagnosticos', icon: 'check-circle', label: 'Diagnósticos' },
   { path: '/admin/documentos', icon: 'cloud-upload', label: 'Documentos' },
   { path: '/admin/jobs', icon: 'folder-sync', label: 'Jobs de sincronização' },
   { path: '/admin/avaliacao', icon: 'flask', label: 'Avaliação do RAG' },

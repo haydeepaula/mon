@@ -8,6 +8,9 @@ from app.domain.ports import LLMProvider
 from app.infrastructure.llm.json_utils import parse_json_object
 
 # Modelos que não geram texto de chat.
+# Limite por requisição: evita que uma chamada pendurada trave o worker.
+_TIMEOUT_MS = 180_000
+
 _EXCLUDED = ("embedding", "tts", "image", "imagen", "veo", "audio", "live", "robotics", "aqa", "learnlm")
 
 
@@ -17,7 +20,7 @@ class GoogleLLMProvider(LLMProvider):
     provider = "google"
 
     def __init__(self, api_key: str, model: str, reasoning_level: str = "low"):
-        self.client = genai.Client(api_key=api_key)
+        self.client = genai.Client(api_key=api_key, http_options=types.HttpOptions(timeout=_TIMEOUT_MS))
         self.model = model
         self.reasoning_level = reasoning_level
 
@@ -44,6 +47,14 @@ class GoogleLLMProvider(LLMProvider):
         )
         return parse_json_object(self._text(response))
 
+    def generate_structured(self, prompt: str, system: str, schema: dict, name: str) -> dict:
+        response = self.client.models.generate_content(
+            model=self.model,
+            contents=self._contents([ChatMessage("user", prompt)]),
+            config=self._config(system, json_mode=True, schema=schema),
+        )
+        return parse_json_object(self._text(response))
+
     def list_models(self) -> list[ModelInfo]:
         models: list[ModelInfo] = []
         for model in self.client.models.list():
@@ -64,13 +75,15 @@ class GoogleLLMProvider(LLMProvider):
             )
         return models
 
-    def _config(self, system: str, json_mode: bool = False) -> types.GenerateContentConfig:
+    def _config(self, system: str, json_mode: bool = False, schema: dict | None = None) -> types.GenerateContentConfig:
         options: dict = {"system_instruction": system}
         # Gemini 3+ usa níveis de raciocínio; temperatura não é recomendada.
         if self.model.startswith("gemini-3"):
             options["thinking_config"] = types.ThinkingConfig(thinking_level=self.reasoning_level.upper())
         if json_mode:
             options["response_mime_type"] = "application/json"
+        if schema is not None:
+            options["response_json_schema"] = schema
         return types.GenerateContentConfig(**options)
 
     @staticmethod

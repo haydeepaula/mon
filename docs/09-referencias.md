@@ -5,7 +5,13 @@ As referências de método de pesquisa (Design Science Research, SUS, Wilcoxon) 
 
 ## 9.1 Fundamentação teórica
 
+AMERSHI, Saleema *et al*. Guidelines for human-AI interaction. *In*: CHI CONFERENCE ON HUMAN FACTORS IN COMPUTING SYSTEMS, 2019, Glasgow. **Proceedings** [...]. New York: Association for Computing Machinery, 2019. p. 1-13.
+
 COCKBURN, Alistair. **Hexagonal architecture**. 2005. Disponível em: https://alistair.cockburn.us/hexagonal-architecture/. Acesso em: 12 out. 2026.
+
+COHEN, Jacob. A coefficient of agreement for nominal scales. **Educational and Psychological Measurement**, v. 20, n. 1, p. 37-46, 1960.
+
+COHEN, Jacob. Weighted kappa: nominal scale agreement provision for scaled disagreement or partial credit. **Psychological Bulletin**, v. 70, n. 4, p. 213-220, 1968.
 
 DAVENPORT, Thomas H.; PRUSAK, Laurence. **Working knowledge**: how organizations manage what they know. Boston: Harvard Business School Press, 1998.
 
@@ -18,6 +24,8 @@ GAMMA, Erich; HELM, Richard; JOHNSON, Ralph; VLISSIDES, John. **Design patterns*
 GAO, Yunfan *et al*. Retrieval-augmented generation for large language models: a survey. **arXiv**, 2023. Disponível em: https://arxiv.org/abs/2312.10997. Acesso em: 12 out. 2026.
 
 KUSUPATI, Aditya *et al*. Matryoshka representation learning. *In*: ADVANCES IN NEURAL INFORMATION PROCESSING SYSTEMS, 35., 2022. **Proceedings** [...]. Red Hook: Curran Associates, 2022. Disponível em: https://arxiv.org/abs/2205.13147.
+
+LANDIS, J. Richard; KOCH, Gary G. The measurement of observer agreement for categorical data. **Biometrics**, v. 33, n. 1, p. 159-174, 1977.
 
 LEE, Jinhyuk *et al*. Gemini Embedding: generalizable embeddings from Gemini. **arXiv**, 2025. Disponível em: https://arxiv.org/abs/2503.07891. Acesso em: 12 out. 2026.
 
@@ -88,5 +96,7 @@ TESSERACT OCR. **Tesseract documentation**. 2026. Disponível em: https://tesser
 | Tamanho do contexto | Liu *et al.* (2024) |
 | OCR | Smith (2007) |
 | Avaliação | Voorhees (1999); Es *et al.* (2024); Zheng *et al.* (2023) |
+| Concordância diagnóstica | Cohen (1960; 1968); Landis e Koch (1977) |
+| Interação humano-IA | Amershi *et al.* (2019) |
 | Arquitetura e padrões | Gamma *et al.* (1994); Fowler (2002); Cockburn (2005); Martin (2017) |
 | Segurança | Jones, Bradley e Sakimura (2015); Provos e Mazières (1999) |

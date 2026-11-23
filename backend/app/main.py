@@ -5,7 +5,7 @@ from fastapi import FastAPI, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
 
-from app.api.routers import admin, auth, conversations, documents, evals, framework, health, jobs
+from app.api.routers import admin, auth, conversations, diagnosticos, documents, evals, framework, health, jobs
 from app.core.config import get_settings
 from app.core.exceptions import MonError
 from app.core.logging import setup_logging
@@ -44,7 +44,7 @@ def create_app() -> FastAPI:
         return JSONResponse(status_code=500, content={"detail": "Erro interno no servidor."})
 
     for router in (health.router, auth.router, conversations.router, documents.router,
-                   jobs.router, admin.router, evals.router, framework.router):
+                   jobs.router, admin.router, evals.router, framework.router, diagnosticos.router):
         app.include_router(router, prefix="/api")
     return app
 

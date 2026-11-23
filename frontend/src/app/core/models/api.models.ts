@@ -62,6 +62,13 @@ export interface Message {
 
 export type DocumentStatus = 'pending' | 'processing' | 'indexed' | 'failed';
 
+export type Colecao = 'normativa' | 'institucional';
+
+export interface DocumentVocabulary {
+  colecoes: Colecao[];
+  tipos_documento: Record<Colecao, string[]>;
+}
+
 export interface PageReport {
   page: number;
   ocr: boolean;
@@ -84,6 +91,9 @@ export interface DocumentItem {
   chunk_count: number;
   page_count: number | null;
   ocr_pages: number;
+  colecao: Colecao;
+  tipo_documento: string | null;
+  curso: string | null;
   extraction: { sections?: number; characters?: number; title?: string; pages?: PageReport[]; sheets?: string[] };
   error: string | null;
   created_at: string;
@@ -108,7 +118,7 @@ export interface DocumentStats {
 }
 
 export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'canceled';
-export type JobType = 'ingest_document' | 'sync_folder' | 'reindex_all' | 'eval_run' | 'eval_generate';
+export type JobType = 'ingest_document' | 'sync_folder' | 'reindex_all' | 'eval_run' | 'eval_generate' | 'diagnostico_verificar';
 
 export interface Job {
   id: string;

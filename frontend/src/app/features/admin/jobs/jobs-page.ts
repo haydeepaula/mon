@@ -24,6 +24,7 @@ export const JOB_TYPES: Record<JobType, { label: string; icon: string }> = {
   reindex_all: { label: 'Reindexação geral', icon: 'refresh' },
   eval_run: { label: 'Avaliação do RAG', icon: 'flask' },
   eval_generate: { label: 'Geração de casos de teste', icon: 'sparkles' },
+  diagnostico_verificar: { label: 'Verificação do diagnóstico', icon: 'check-circle' },
 };
 
 @Component({

@@ -40,6 +40,16 @@ export const routes: Routes = [
             loadComponent: () => import('./features/admin/jobs/jobs-page').then((m) => m.JobsPage),
           },
           {
+            path: 'diagnosticos',
+            title: 'Diagnósticos · Mon',
+            loadComponent: () => import('./features/diagnosticos/diagnosticos-page').then((m) => m.DiagnosticosPage),
+          },
+          {
+            path: 'diagnosticos/:id',
+            title: 'Diagnóstico · Mon',
+            loadComponent: () => import('./features/diagnosticos/diagnostico-detail').then((m) => m.DiagnosticoDetail),
+          },
+          {
             path: 'avaliacao',
             title: 'Avaliação · Mon',
             loadComponent: () => import('./features/admin/evals/evals-page').then((m) => m.EvalsPage),

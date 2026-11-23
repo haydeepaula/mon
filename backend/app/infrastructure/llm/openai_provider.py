@@ -17,7 +17,7 @@ class OpenAILLMProvider(LLMProvider):
     provider = "openai"
 
     def __init__(self, api_key: str, model: str, reasoning_level: str = "low"):
-        self.client = OpenAI(api_key=api_key)
+        self.client = OpenAI(api_key=api_key, timeout=180.0)
         self.model = model
         self.reasoning_level = reasoning_level
 
@@ -36,6 +36,11 @@ class OpenAILLMProvider(LLMProvider):
     def generate_json(self, prompt: str, system: str) -> dict:
         request = self._request([ChatMessage("user", prompt)], system)
         request["text"] = {"format": {"type": "json_object"}}
+        return parse_json_object(self.client.responses.create(**request).output_text)
+
+    def generate_structured(self, prompt: str, system: str, schema: dict, name: str) -> dict:
+        request = self._request([ChatMessage("user", prompt)], system)
+        request["text"] = {"format": {"type": "json_schema", "name": name, "schema": schema, "strict": True}}
         return parse_json_object(self.client.responses.create(**request).output_text)
 
     def list_models(self) -> list[ModelInfo]:

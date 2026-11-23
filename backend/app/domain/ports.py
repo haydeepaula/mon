@@ -45,6 +45,11 @@ class LLMProvider(ABC):
     @abstractmethod
     def generate_json(self, prompt: str, system: str) -> dict: ...
 
+    def generate_structured(self, prompt: str, system: str, schema: dict, name: str) -> dict:
+        """Resposta JSON conforme ``schema`` (JSON Schema). Adaptadores que suportam saída
+        estruturada nativa sobrescrevem este método; o padrão recorre ao modo JSON simples."""
+        return self.generate_json(prompt, system)
+
     @abstractmethod
     def list_models(self) -> list[ModelInfo]: ...
 

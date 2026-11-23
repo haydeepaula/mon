@@ -89,6 +89,20 @@ Ver [13. Framework de critérios](13-framework-de-criterios.md). O parâmetro `v
 | POST | `/framework/importar/csv` | Importa CSV (multipart: `file`, `versao`, `modo`) |
 | GET | `/framework/exportar?versao=&formato=json\|csv` | Exporta a versão (apêndice do TCC) |
 
+## Diagnóstico (**admin**)
+
+Ver [14. Diagnóstico](14-diagnostico.md).
+
+| Método | Rota | Descrição | Etapa (Quadro 9) |
+|---|---|---|---|
+| GET / POST | `/diagnosticos` | Lista / cria a partir do escopo e da versão do framework | 1 |
+| POST | `/diagnosticos/requisitos-aplicaveis?versao=` | Prévia dos requisitos que entram com o escopo enviado | 1 |
+| GET / PATCH / DELETE | `/diagnosticos/{id}` | Consulta / altera (escopo só no planejamento) / exclui | 1 |
+| POST | `/diagnosticos/{id}/verificar` | Agenda a verificação assistida (`{item_ids?}`); retorna o job | 4 |
+| GET | `/diagnosticos/{id}/itens`, `/diagnosticos/{id}/itens/{item}` | Itens com requisito, evidências e proposta (oculta na validação cega) | 4-5 |
+| PUT | `/diagnosticos/{id}/itens/{item}/validacao` | `{classificacao_final, conceito_final, divergencia_causa, comentario}` | 5 |
+| GET | `/diagnosticos/{id}/metricas?referencia=` | Concordância: acordo, κ, matriz de confusão, causas | 3.8, nível 2 |
+
 ## Saúde
 
 | Método | Rota | Descrição |
