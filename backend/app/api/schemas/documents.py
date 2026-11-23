@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.api.schemas.common import ORMModel
 
@@ -20,11 +20,25 @@ class DocumentOut(ORMModel):
     chunk_count: int
     page_count: int | None
     ocr_pages: int
+    colecao: str
+    tipo_documento: str | None
+    curso: str | None
     extraction: dict
     error: str | None
     created_at: datetime
     updated_at: datetime
     indexed_at: datetime | None
+
+
+class DocumentClassify(BaseModel):
+    colecao: str
+    tipo_documento: str | None = None
+    curso: str | None = Field(default=None, max_length=80)
+
+
+class DocumentVocabulary(BaseModel):
+    colecoes: list[str]
+    tipos_documento: dict[str, list[str]]
 
 
 class UploadItemOut(BaseModel):

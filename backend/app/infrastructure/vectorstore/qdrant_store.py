@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Mapping, Sequence
 
 from qdrant_client import QdrantClient, models
 
@@ -13,6 +14,9 @@ _PAYLOAD_INDEXES = {
     "version": models.PayloadSchemaType.INTEGER,
     "file_type": models.PayloadSchemaType.KEYWORD,
     "filename": models.PayloadSchemaType.KEYWORD,
+    "colecao": models.PayloadSchemaType.KEYWORD,
+    "tipo_documento": models.PayloadSchemaType.KEYWORD,
+    "curso": models.PayloadSchemaType.KEYWORD,
 }
 
 
@@ -51,11 +55,25 @@ class QdrantVectorStore(VectorStore):
                 wait=True,
             )
 
-    def search(self, vector: list[float], limit: int) -> list[RetrievedChunk]:
+    def search(
+        self, vector: list[float], limit: int, filters: Mapping[str, str | Sequence[str]] | None = None
+    ) -> list[RetrievedChunk]:
         response = self.client.query_points(
-            collection_name=self.collection, query=vector, limit=limit, with_payload=True
+            collection_name=self.collection,
+            query=vector,
+            limit=limit,
+            query_filter=build_filter(filters),
+            with_payload=True,
         )
         return [self._to_chunk(point) for point in response.points]
+
+    def set_payload(self, document_id: str, payload: Mapping[str, object]) -> None:
+        self.client.set_payload(
+            collection_name=self.collection,
+            payload=dict(payload),
+            points=models.FilterSelector(filter=models.Filter(must=[self._match("document_id", document_id)])),
+            wait=True,
+        )
 
     def delete_document(self, document_id: str) -> None:
         self._delete(models.Filter(must=[self._match("document_id", document_id)]))
@@ -113,3 +131,18 @@ class QdrantVectorStore(VectorStore):
             score=float(point.score or 0.0),
             payload=payload,
         )
+
+
+def build_filter(filters: Mapping[str, str | Sequence[str]] | None) -> models.Filter | None:
+    """Converte {campo: valor | [valores]} em filtro do Qdrant; valores vazios são ignorados."""
+    conditions: list[models.FieldCondition] = []
+    for field, value in (filters or {}).items():
+        if value is None:
+            continue
+        if isinstance(value, str):
+            conditions.append(models.FieldCondition(key=field, match=models.MatchValue(value=value)))
+        else:
+            values = [v for v in value if v]
+            if values:
+                conditions.append(models.FieldCondition(key=field, match=models.MatchAny(any=values)))
+    return models.Filter(must=conditions) if conditions else None

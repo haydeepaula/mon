@@ -2,6 +2,10 @@
 
 Compara o hash de cada arquivo com o registrado no banco: novos são indexados,
 alterados são reindexados (removendo os vetores antigos) e removidos saem da base.
+
+A subpasta define a coleção lógica e o tipo do documento (ver domain/knowledge_base.py):
+``normativa/<tipo>/arquivo`` e ``institucional/<tipo>/arquivo``. Arquivos fora dessas
+pastas mantêm a classificação atual (padrão: institucional).
 """
 
 import mimetypes
@@ -11,10 +15,12 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 
 from app.db.models import Document, DocumentSource, DocumentStatus
+from app.domain.knowledge_base import classificar_por_caminho
 from app.domain.ports import VectorStore
 from app.infrastructure.loaders.factory import LoaderFactory
 from app.repositories.document_repository import DocumentRepository
 from app.services.document_service import sha256_of
+from app.services.ingestion_service import vector_payload
 from app.services.job_service import JobService
 from app.services.progress import ProgressReporter
 
@@ -29,7 +35,7 @@ class FolderSyncService:
         self.jobs = JobService(session)
 
     def sync(self, reporter: ProgressReporter, user_id: uuid.UUID | None = None) -> dict:
-        summary = {"added": 0, "updated": 0, "removed": 0, "unchanged": 0, "ignored": 0}
+        summary = {"added": 0, "updated": 0, "removed": 0, "unchanged": 0, "ignored": 0, "reclassified": 0}
         if not self.root.exists():
             reporter.log(f"Pasta {self.root} não existe.")
             return summary
@@ -47,6 +53,7 @@ class FolderSyncService:
             seen.add(relative)
             digest = sha256_of(path)
             document = known.get(relative)
+            classificacao = classificar_por_caminho(relative)
             if document is None:
                 document = self.documents.add(
                     Document(
@@ -60,6 +67,9 @@ class FolderSyncService:
                         source_path=relative,
                     )
                 )
+                if classificacao:
+                    document.colecao = classificacao.colecao
+                    document.tipo_documento = classificacao.tipo_documento
                 self.jobs.enqueue_ingest(document, user_id, reason="sync:new")
                 summary["added"] += 1
                 reporter.log(f"Novo: {relative}")
@@ -72,6 +82,9 @@ class FolderSyncService:
                 reporter.log(f"Alterado: {relative}")
             else:
                 summary["unchanged"] += 1
+                if classificacao and self._reclassify(document, classificacao.colecao, classificacao.tipo_documento):
+                    summary["reclassified"] += 1
+                    reporter.log(f"Reclassificado: {relative} → {classificacao.colecao}")
 
         for relative, document in known.items():
             if relative not in seen:
@@ -82,3 +95,12 @@ class FolderSyncService:
 
         self.session.commit()
         return summary
+
+    def _reclassify(self, document: Document, colecao: str, tipo_documento: str | None) -> bool:
+        if (document.colecao, document.tipo_documento) == (colecao, tipo_documento):
+            return False
+        document.colecao = colecao
+        document.tipo_documento = tipo_documento
+        if document.status == DocumentStatus.INDEXED:
+            self.store.set_payload(str(document.id), vector_payload(document))
+        return True

@@ -128,3 +128,20 @@ cada arquivo com o registrado:
 | Sem alteração | nada |
 
 O resumo (`added`, `updated`, `removed`, `unchanged`, `ignored`) fica no resultado do job.
+
+## 4.9 Coleções lógicas: normativa e institucional
+
+Para o diagnóstico (TCC, seção 3.6.1 a), cada documento pertence a uma coleção lógica, definida em `backend/app/domain/knowledge_base.py`:
+
+- `normativa`: fontes dos requisitos (Quadro 3 do TCC). Tipos: `lei`, `decreto`, `portaria`, `resolucao`, `parecer`, `instrumento`, `referencial`, `nota_tecnica`, `minuta`, `outro`.
+- `institucional` (padrão): evidências do curso (Quadro 5). Tipos: `ppc`, `matriz`, `ementas`, `regulamento`, `relatorio_cpa`, `relatorio_inep`, `enade`, `ata`, `polos_ava`, `outro`.
+
+A coleção é um campo (`colecao`, junto com `tipo_documento` e `curso`) gravado no banco e replicado no payload de cada trecho no Qdrant, na mesma coleção física. A busca vetorial aceita filtros por esses campos, o que permite, por exemplo, buscar evidências apenas nos documentos do curso.
+
+Formas de classificar:
+
+- **Pasta de fontes:** a subpasta define a classificação: `data/sources/normativa/<tipo>/arquivo` ou `data/sources/institucional/<tipo>/arquivo`. Arquivos fora dessas pastas mantêm a classificação atual.
+- **Upload:** campos opcionais `colecao`, `tipo_documento` e `curso`.
+- **Reclassificação:** `PATCH /api/documents/{id}` atualiza o banco e o payload no Qdrant sem gerar embeddings de novo.
+
+Na inicialização, a API e o worker replicam no Qdrant a classificação de todos os documentos indexados, o que cobre pontos gravados antes da existência desses campos.

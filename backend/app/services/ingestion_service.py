@@ -25,6 +25,15 @@ logger = logging.getLogger(__name__)
 _POINT_NAMESPACE = uuid.UUID("6f1c2a52-6c55-4f0e-9a51-9b8e6f3f2d10")
 
 
+def vector_payload(document: Document) -> dict:
+    """Campos de classificação replicados no payload de cada trecho (filtros da recuperação)."""
+    return {
+        "colecao": document.colecao or "institucional",
+        "tipo_documento": document.tipo_documento,
+        "curso": document.curso,
+    }
+
+
 def point_id(document_id: str, version: int, chunk_index: int) -> str:
     return str(uuid.uuid5(_POINT_NAMESPACE, f"{document_id}:{version}:{chunk_index}"))
 
@@ -146,6 +155,7 @@ class IngestionService:
             "file_type": document.file_type,
             "source": document.source,
             "sha256": document.sha256,
+            **vector_payload(document),
             "page": chunk.page,
             "sheet": chunk.sheet,
             "heading": chunk.heading,

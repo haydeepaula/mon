@@ -20,6 +20,8 @@ class RagContext:
     candidates: list[RetrievedChunk] = field(default_factory=list)
     context: list[RetrievedChunk] = field(default_factory=list)
     timings_ms: dict[str, int] = field(default_factory=dict)
+    # Filtros de payload da busca vetorial (ex.: {"colecao": "institucional"}).
+    filters: dict[str, str | list[str]] = field(default_factory=dict)
 
 
 class RagStep(ABC):
@@ -63,7 +65,7 @@ class VectorSearchStep(RagStep):
 
     def run(self, ctx: RagContext) -> None:
         vector = self.embedder.embed_query(ctx.search_query or ctx.question)
-        ctx.candidates = self.store.search(vector, self.top_k)
+        ctx.candidates = self.store.search(vector, self.top_k, ctx.filters or None)
 
 
 class RerankStep(RagStep):
@@ -83,8 +85,10 @@ class RetrievalPipeline:
     def __init__(self, steps: list[RagStep]):
         self.steps = steps
 
-    def run(self, question: str, history: list[ChatMessage]) -> RagContext:
-        ctx = RagContext(question=question, history=history)
+    def run(
+        self, question: str, history: list[ChatMessage], filters: dict[str, str | list[str]] | None = None
+    ) -> RagContext:
+        ctx = RagContext(question=question, history=history, filters=dict(filters or {}))
         for step in self.steps:
             started = time.perf_counter()
             step.run(ctx)

@@ -27,10 +27,12 @@ exigem o papel de administrador.
 
 | Método | Rota | Descrição |
 |---|---|---|
-| GET | `/documents?q=&status_filter=` | Lista documentos (**admin**) |
+| GET | `/documents?q=&status_filter=&colecao=` | Lista documentos, com filtro opcional por coleção (**admin**) |
+| GET | `/documents/vocabulary` | Coleções lógicas e tipos de documento aceitos em cada uma (**admin**) |
 | GET | `/documents/stats` | Totais por status, chunks, vetores e extensões suportadas (**admin**) |
 | GET | `/documents/names` | Nomes dos arquivos (para a avaliação) (**admin**) |
-| POST | `/documents/upload` | Upload multipart (`files`), um ou vários arquivos (**admin**) |
+| POST | `/documents/upload` | Upload multipart (`files`), um ou vários arquivos; campos opcionais `colecao`, `tipo_documento` e `curso` (**admin**) |
+| PATCH | `/documents/{id}` | Reclassifica `colecao`, `tipo_documento` e `curso` sem reindexar (**admin**) |
 | GET | `/documents/{id}` | Detalhes, incluindo relatório de extração (**admin**) |
 | GET | `/documents/{id}/download` | Baixa o arquivo original (usuário autenticado) |
 | POST | `/documents/{id}/reindex` | Agenda reindexação (**admin**) |

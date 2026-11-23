@@ -116,6 +116,10 @@ class Document(TimestampMixin, Base):
     chunk_count: Mapped[int] = mapped_column(Integer, default=0)
     page_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     ocr_pages: Mapped[int] = mapped_column(Integer, default=0)
+    # Coleção lógica (normativa | institucional), tipo do documento e curso: ver domain/knowledge_base.py.
+    colecao: Mapped[str] = mapped_column(String(20), default="institucional", server_default="institucional", index=True)
+    tipo_documento: Mapped[str | None] = mapped_column(String(40), nullable=True, index=True)
+    curso: Mapped[str | None] = mapped_column(String(80), nullable=True, index=True)
     extraction: Mapped[dict] = mapped_column(JsonType, default=dict)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     indexed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

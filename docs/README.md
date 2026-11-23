@@ -11,3 +11,4 @@
 9. [Referências](09-referencias.md): referências bibliográficas em ABNT.
 10. [Execução](10-execucao.md): instalação, configuração, testes e solução de problemas.
 11. [Metodologia](11-metodologia.md): passo a passo do desenvolvimento, base para o capítulo de metodologia do TCC.
+12. [Plano de diagnóstico](12-plano-diagnostico.md): expansão para o framework de critérios e o método de consultoria do TCC.

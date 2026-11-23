@@ -13,10 +13,12 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.core.exceptions import ValidationError
 from app.db.models import Document, DocumentSource, DocumentStatus, Job
+from app.domain.knowledge_base import COLECAO_PADRAO, Classificacao, validar_classificacao
 from app.domain.ports import FileStorage, VectorStore
 from app.infrastructure.loaders.factory import LoaderFactory
 from app.infrastructure.storage.local_storage import safe_filename
 from app.repositories.document_repository import DocumentRepository
+from app.services.ingestion_service import vector_payload
 from app.services.job_service import JobService
 
 logger = logging.getLogger(__name__)
@@ -49,7 +51,15 @@ class DocumentService:
         self.loaders = loaders
         self.max_bytes = get_settings().max_upload_mb * 1024 * 1024
 
-    def upload(self, filename: str, stream: BinaryIO, user_id: uuid.UUID | None) -> UploadResult:
+    def upload(
+        self,
+        filename: str,
+        stream: BinaryIO,
+        user_id: uuid.UUID | None,
+        colecao: str | None = None,
+        tipo_documento: str | None = None,
+        curso: str | None = None,
+    ) -> UploadResult:
         """Salva o arquivo e agenda a indexação.
 
         - mesmo conteúdo já indexado → ignorado (duplicado);
@@ -57,6 +67,7 @@ class DocumentService:
         - caso contrário → novo documento.
         """
         name = safe_filename(filename)
+        classificacao = self._validar(colecao or COLECAO_PADRAO, tipo_documento)
         if not self.loaders.supports(name):
             return UploadResult(name, "rejected", f"Tipo não suportado ({Path(name).suffix or 'sem extensão'}).")
 
@@ -91,6 +102,9 @@ class DocumentService:
             document.status = DocumentStatus.PENDING
             document.error = None
             document.uploaded_by = user_id
+            document.colecao = classificacao.colecao
+            document.tipo_documento = classificacao.tipo_documento
+            document.curso = _limpar(curso)
             self.session.flush()
 
             job = self.jobs.enqueue_ingest(document, user_id, reason=status)
@@ -98,6 +112,27 @@ class DocumentService:
             return UploadResult(name, status, message, document, job)
         finally:
             temp_path.unlink(missing_ok=True)
+
+    def classify(
+        self, document_id: uuid.UUID, colecao: str, tipo_documento: str | None, curso: str | None
+    ) -> Document:
+        """Altera coleção, tipo e curso. Atualiza o payload no Qdrant sem reindexar."""
+        document = self.documents.get_or_raise(document_id)
+        classificacao = self._validar(colecao, tipo_documento)
+        document.colecao = classificacao.colecao
+        document.tipo_documento = classificacao.tipo_documento
+        document.curso = _limpar(curso)
+        if document.status == DocumentStatus.INDEXED:
+            self.store.set_payload(str(document.id), vector_payload(document))
+        self.session.flush()
+        return document
+
+    @staticmethod
+    def _validar(colecao: str, tipo_documento: str | None) -> Classificacao:
+        try:
+            return validar_classificacao(colecao, _limpar(tipo_documento))
+        except ValueError as exc:
+            raise ValidationError(str(exc)) from None
 
     def reindex(self, document_id: uuid.UUID, user_id: uuid.UUID | None) -> Job | None:
         document = self.documents.get_or_raise(document_id)
@@ -117,8 +152,10 @@ class DocumentService:
     def get(self, document_id: uuid.UUID) -> Document:
         return self.documents.get_or_raise(document_id)
 
-    def search(self, query: str | None = None, status: str | None = None) -> list[Document]:
-        return self.documents.search(query, status)
+    def search(
+        self, query: str | None = None, status: str | None = None, colecao: str | None = None
+    ) -> list[Document]:
+        return self.documents.search(query, status, colecao)
 
     def file_path(self, document_id: uuid.UUID) -> tuple[Path, Document]:
         document = self.get(document_id)
@@ -126,3 +163,8 @@ class DocumentService:
         if not path.exists():
             raise ValidationError("Arquivo original não está mais disponível.")
         return path, document
+
+
+def _limpar(value: str | None) -> str | None:
+    value = (value or "").strip()
+    return value or None

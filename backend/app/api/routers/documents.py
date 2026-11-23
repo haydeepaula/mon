@@ -1,13 +1,20 @@
 import uuid
 
-from fastapi import APIRouter, File, UploadFile, status
+from fastapi import APIRouter, File, Form, UploadFile, status
 from fastapi.responses import FileResponse
 
 from app.api.deps import AdminUser, CurrentUser, DbSession
-from app.api.schemas.documents import DocumentOut, DocumentStats, UploadItemOut
+from app.api.schemas.documents import (
+    DocumentClassify,
+    DocumentOut,
+    DocumentStats,
+    DocumentVocabulary,
+    UploadItemOut,
+)
 from app.api.schemas.jobs import JobOut
 from app.container import get_file_storage, get_loader_factory, get_vector_store
 from app.core.exceptions import ConflictError
+from app.domain.knowledge_base import TIPOS_DOCUMENTO, Colecao
 from app.repositories.document_repository import DocumentRepository
 from app.services.document_service import DocumentService
 
@@ -19,8 +26,19 @@ def _service(db) -> DocumentService:
 
 
 @router.get("", response_model=list[DocumentOut])
-def list_documents(_: AdminUser, db: DbSession, q: str | None = None, status_filter: str | None = None):
-    return _service(db).search(q, status_filter)
+def list_documents(
+    _: AdminUser, db: DbSession, q: str | None = None, status_filter: str | None = None, colecao: str | None = None
+):
+    return _service(db).search(q, status_filter, colecao)
+
+
+@router.get("/vocabulary", response_model=DocumentVocabulary)
+def document_vocabulary(_: AdminUser):
+    """Coleções lógicas e tipos de documento aceitos em cada uma."""
+    return DocumentVocabulary(
+        colecoes=[c.value for c in Colecao],
+        tipos_documento={c.value: list(tipos) for c, tipos in TIPOS_DOCUMENTO.items()},
+    )
 
 
 @router.get("/stats", response_model=DocumentStats)
@@ -39,11 +57,18 @@ def document_names(_: AdminUser, db: DbSession):
 
 
 @router.post("/upload", response_model=list[UploadItemOut])
-def upload_documents(user: AdminUser, db: DbSession, files: list[UploadFile] = File(...)):
+def upload_documents(
+    user: AdminUser,
+    db: DbSession,
+    files: list[UploadFile] = File(...),
+    colecao: str | None = Form(None),
+    tipo_documento: str | None = Form(None),
+    curso: str | None = Form(None),
+):
     service = _service(db)
     items: list[UploadItemOut] = []
     for upload in files:
-        result = service.upload(upload.filename or "arquivo", upload.file, user.id)
+        result = service.upload(upload.filename or "arquivo", upload.file, user.id, colecao, tipo_documento, curso)
         db.commit()
         items.append(
             UploadItemOut(
@@ -60,6 +85,14 @@ def upload_documents(user: AdminUser, db: DbSession, files: list[UploadFile] = F
 @router.get("/{document_id}", response_model=DocumentOut)
 def get_document(document_id: uuid.UUID, _: AdminUser, db: DbSession):
     return _service(db).get(document_id)
+
+
+@router.patch("/{document_id}", response_model=DocumentOut)
+def classify_document(document_id: uuid.UUID, payload: DocumentClassify, _: AdminUser, db: DbSession):
+    """Reclassifica o documento (coleção, tipo, curso) sem reindexar."""
+    document = _service(db).classify(document_id, payload.colecao, payload.tipo_documento, payload.curso)
+    db.commit()
+    return document
 
 
 @router.get("/{document_id}/download")

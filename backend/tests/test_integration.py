@@ -152,3 +152,39 @@ def test_ingest_reindex_answer_eval_and_delete(store, session, tmp_path):
     session.commit()
     assert store.count(str(doc_id)) == 0
     assert not (tmp_path / str(doc_id)).exists()
+
+
+def test_colecoes_logicas_filtram_a_busca(store, session, tmp_path):
+    rag_settings = RagSettings(chunk_size=300, chunk_overlap=50, query_rewrite_enabled=False)
+    documents = DocumentService(session, LocalFileStorage(tmp_path), store, get_loader_factory())
+    ingestion = IngestionService(session, get_loader_factory(), build_chunker(rag_settings), HashEmbedder(), store)
+    texto = "A extensão deve corresponder a no mínimo 10% da carga horária curricular."
+    tag = uuid.uuid4().hex[:8]
+
+    norma = _upload(documents, texto, f"res-7-2018-{tag}.txt")
+    ppc = documents.upload(
+        f"ppc-{tag}.txt", io.BytesIO((texto + " O PPC prevê 360 horas.").encode()), None,
+        colecao="institucional", tipo_documento="ppc", curso="ep-ead",
+    )
+    session.commit()
+    documents.classify(norma.document.id, "normativa", "resolucao", None)
+    session.commit()
+    for result in (norma, ppc):
+        ingestion.ingest(result.document.id)
+
+    vector = HashEmbedder().embed_query("extensão carga horária")
+    institucional = store.search(vector, 10, {"colecao": "institucional"})
+    assert {h.payload["document_id"] for h in institucional} == {str(ppc.document.id)}
+    assert institucional[0].payload["tipo_documento"] == "ppc"
+    assert institucional[0].payload["curso"] == "ep-ead"
+
+    # Reclassificar atualiza o payload sem reindexar (a versão não muda).
+    documents.classify(ppc.document.id, "normativa", None, None)
+    session.commit()
+    assert store.search(vector, 10, {"colecao": "institucional"}) == []
+    assert len({h.payload["document_id"] for h in store.search(vector, 10, {"colecao": "normativa"})}) == 2
+    assert ppc.document.version == 1
+
+    for result in (norma, ppc):
+        documents.delete(result.document.id)
+    session.commit()

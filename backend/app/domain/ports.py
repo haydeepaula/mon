@@ -4,7 +4,7 @@ Os serviços dependem destas abstrações; a infraestrutura fornece os adaptador
 """
 
 from abc import ABC, abstractmethod
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping, Sequence
 from pathlib import Path
 from typing import BinaryIO
 
@@ -61,7 +61,15 @@ class VectorStore(ABC):
     def upsert(self, points: list[VectorPoint]) -> None: ...
 
     @abstractmethod
-    def search(self, vector: list[float], limit: int) -> list[RetrievedChunk]: ...
+    def search(
+        self, vector: list[float], limit: int, filters: Mapping[str, str | Sequence[str]] | None = None
+    ) -> list[RetrievedChunk]:
+        """Busca por similaridade. ``filters`` restringe por campos do payload
+        (valor único = igualdade; lista = qualquer um dos valores)."""
+
+    @abstractmethod
+    def set_payload(self, document_id: str, payload: Mapping[str, object]) -> None:
+        """Atualiza campos do payload de todos os trechos de um documento, sem reindexar."""
 
     @abstractmethod
     def delete_document(self, document_id: str) -> None: ...

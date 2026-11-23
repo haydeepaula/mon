@@ -8,12 +8,16 @@ class DocumentRepository(SqlAlchemyRepository[Document]):
     model = Document
     not_found_message = "Documento não encontrado."
 
-    def search(self, query: str | None = None, status: str | None = None) -> list[Document]:
+    def search(
+        self, query: str | None = None, status: str | None = None, colecao: str | None = None
+    ) -> list[Document]:
         stmt = select(Document).order_by(Document.updated_at.desc())
         if query:
             stmt = stmt.where(Document.filename.ilike(f"%{query}%"))
         if status:
             stmt = stmt.where(Document.status == status)
+        if colecao:
+            stmt = stmt.where(Document.colecao == colecao)
         return list(self.session.scalars(stmt))
 
     def get_by_sha256(self, sha256: str) -> Document | None:
