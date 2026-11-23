@@ -11,29 +11,88 @@
       </div>
     </header>
 
-    <div class="providers">
-      @for (provider of providers(); track provider.id) {
-        <div class="provider card">
-          <span class="provider-icon"><app-icon [name]="provider.id === 'cohere' ? 'layers' : 'cpu'" [size]="18" /></span>
-          <div class="grow">
-            <div class="provider-name">{{ provider.name }}</div>
-            <div class="muted small">
-              @if (provider.id === 'cohere') {
-                Rerank de trechos
-              } @else if (provider.id === 'google') {
-                LLM e embeddings (gemini-embedding-001)
-              } @else {
-                LLM alternativo
+    <section class="card keys">
+      <div class="card-header">
+        <div>
+          <h3>Chaves de API</h3>
+          <p>
+            Gravadas criptografadas no servidor e nunca exibidas por inteiro. A chave cadastrada aqui tem prioridade
+            sobre a do arquivo .env e passa a valer em até 10 segundos, sem reiniciar.
+          </p>
+        </div>
+      </div>
+      <div class="key-list">
+        @for (key of keys(); track key.id) {
+          <div class="key-row">
+            <span class="provider-icon"><app-icon [name]="key.id === 'cohere' ? 'layers' : 'cpu'" [size]="18" /></span>
+            <div class="grow">
+              <div class="row">
+                <span class="provider-name">{{ key.nome }}</span>
+                <span class="badge" [class.success]="key.configurada" [class.danger]="!key.configurada">
+                  <app-icon [name]="key.configurada ? 'check' : 'key'" [size]="12" />
+                  {{ key.configurada ? 'Configurada' : 'Sem chave' }}
+                </span>
+              </div>
+              <div class="muted small">{{ key.uso }}</div>
+              <div class="small key-meta">
+                @if (key.configurada) {
+                  <code class="mono">{{ key.mascara }}</code>
+                  ·
+                  @if (key.origem === 'interface') {
+                    cadastrada aqui{{ key.atualizada_em ? ' em ' + (key.atualizada_em | dateTime) : '' }}
+                  } @else {
+                    vinda do .env ({{ key.variavel }})
+                  }
+                }
+                @if (key.ilegivel) {
+                  <span class="warn">A chave cadastrada não pôde ser lida (o JWT_SECRET mudou?). Cadastre-a de novo.</span>
+                }
+              </div>
+              @if (keyTests()[key.id]; as t) {
+                <div class="small key-test" [class.ok]="t.ok" [class.fail]="!t.ok">
+                  <app-icon [name]="t.ok ? 'check-circle' : 'x-circle'" [size]="13" />
+                  {{ t.ok ? t.detalhe : t.erro }} ({{ t.latencia_ms }} ms)
+                </div>
+              }
+              @if (editingKey() === key.id) {
+                <form class="key-form" (ngSubmit)="saveKey(key)">
+                  <input class="input mono" type="password" name="newKey" autocomplete="off" [(ngModel)]="newKey"
+                    [placeholder]="'Cole a nova chave ' + key.nome" />
+                  <label class="check small"><input type="checkbox" name="skipTest" [(ngModel)]="skipTest" /> salvar sem testar</label>
+                  <button type="button" class="btn sm" (click)="editingKey.set(null)">Cancelar</button>
+                  <button type="submit" class="btn sm primary" [disabled]="keyBusy() === key.id">
+                    @if (keyBusy() === key.id) {
+                      <span class="spinner"></span>
+                    }
+                    Salvar
+                  </button>
+                </form>
               }
             </div>
+            @if (editingKey() !== key.id) {
+              <div class="key-actions">
+                @if (key.configurada) {
+                  <button class="btn sm" [disabled]="keyBusy() === key.id" (click)="testKey(key)">
+                    @if (keyBusy() === key.id) {
+                      <span class="spinner"></span>
+                    }
+                    Testar
+                  </button>
+                }
+                <button class="btn sm" (click)="editKey(key.id)">
+                  <app-icon name="key" [size]="13" /> {{ key.origem === 'interface' ? 'Trocar' : 'Cadastrar' }}
+                </button>
+                @if (key.origem === 'interface') {
+                  <button class="btn sm ghost icon danger" title="Remover chave cadastrada" (click)="removeKey(key)">
+                    <app-icon name="trash" [size]="14" />
+                  </button>
+                }
+              </div>
+            }
           </div>
-          <span class="badge" [class.success]="provider.configured" [class.danger]="!provider.configured">
-            <app-icon [name]="provider.configured ? 'check' : 'key'" [size]="12" />
-            {{ provider.configured ? 'Configurado' : 'Sem chave' }}
-          </span>
-        </div>
-      }
-    </div>
+        }
+      </div>
+    </section>
 
     @if (settings(); as current) {
       <div class="current card">

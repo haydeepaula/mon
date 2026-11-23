@@ -12,6 +12,7 @@ qdrant-client==1.19.1
 # Segurança
 pyjwt==2.15.1
 bcrypt==5.0.0
+cryptography==50.0.2
 
 # Provedores de IA
 google-genai==2.29.0

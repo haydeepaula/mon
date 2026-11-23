@@ -1,11 +1,13 @@
 import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
-import { ModelInfo, ModelTestResult, Provider, RagSettings } from '../../../core/models/api.models';
+import { ApiKeyStatus, ApiKeyTest, ModelInfo, ModelTestResult, Provider, RagSettings } from '../../../core/models/api.models';
 import { AdminApi } from '../../../core/services/admin-api.service';
 import { apiErrorMessage } from '../../../core/services/api-error';
+import { ConfirmService } from '../../../core/services/confirm.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { Icon } from '../../../shared/components/icon';
+import { DateTimePipe } from '../../../shared/pipes/format.pipes';
 
 const RERANK_MODELS = [
   { id: 'rerank-v4.0-pro', label: 'rerank-v4.0-pro · maior qualidade' },
@@ -16,7 +18,7 @@ const RERANK_MODELS = [
 
 @Component({
   selector: 'app-models-page',
-  imports: [FormsModule, Icon],
+  imports: [FormsModule, Icon, DateTimePipe],
   templateUrl: './models-page.html',
   styleUrl: './models-page.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -24,6 +26,15 @@ const RERANK_MODELS = [
 export class ModelsPage implements OnInit {
   private readonly api = inject(AdminApi);
   private readonly toast = inject(ToastService);
+  private readonly confirm = inject(ConfirmService);
+
+  // Chaves de API
+  protected readonly keys = signal<ApiKeyStatus[]>([]);
+  protected readonly editingKey = signal<string | null>(null);
+  protected readonly keyBusy = signal<string | null>(null);
+  protected readonly keyTests = signal<Record<string, ApiKeyTest>>({});
+  protected newKey = '';
+  protected skipTest = false;
 
   protected readonly providers = signal<Provider[]>([]);
   protected readonly provider = signal<'google' | 'openai'>('google');
@@ -50,14 +61,75 @@ export class ModelsPage implements OnInit {
 
   async ngOnInit(): Promise<void> {
     try {
-      const [providers, settings] = await Promise.all([this.api.providers(), this.api.settings()]);
+      const [providers, settings, keys] = await Promise.all([this.api.providers(), this.api.settings(), this.api.apiKeys()]);
       this.providers.set(providers);
+      this.keys.set(keys);
       this.applySettings(settings);
       this.provider.set(settings.llm_provider === 'openai' ? 'openai' : 'google');
     } catch (error) {
       this.toast.error(apiErrorMessage(error));
     }
     this.loadModels();
+  }
+
+  protected editKey(id: string): void {
+    this.editingKey.set(id);
+    this.newKey = '';
+    this.skipTest = false;
+  }
+
+  protected async saveKey(key: ApiKeyStatus): Promise<void> {
+    const value = this.newKey.trim();
+    if (value.length < 8) {
+      this.toast.error('Cole a chave de API completa.');
+      return;
+    }
+    this.keyBusy.set(key.id);
+    try {
+      this.keys.set(await this.api.saveApiKey(key.id, value, !this.skipTest));
+      this.newKey = '';
+      this.editingKey.set(null);
+      this.keyTests.update((t) => ({ ...t, [key.id]: undefined as unknown as ApiKeyTest }));
+      this.toast.success(`Chave ${key.nome} salva${this.skipTest ? ' (sem teste)' : ' e testada'}. Vale em até 10 s, sem reiniciar.`);
+      await this.refreshProviders();
+    } catch (error) {
+      this.toast.error(apiErrorMessage(error));
+    } finally {
+      this.keyBusy.set(null);
+    }
+  }
+
+  protected async testKey(key: ApiKeyStatus): Promise<void> {
+    this.keyBusy.set(key.id);
+    try {
+      const result = await this.api.testApiKey(key.id);
+      this.keyTests.update((t) => ({ ...t, [key.id]: result }));
+    } catch (error) {
+      this.toast.error(apiErrorMessage(error));
+    } finally {
+      this.keyBusy.set(null);
+    }
+  }
+
+  protected async removeKey(key: ApiKeyStatus): Promise<void> {
+    const ok = await this.confirm.ask({
+      title: `Remover chave ${key.nome}`,
+      message: `A chave cadastrada pela interface será apagada. Se houver ${key.variavel} no .env, ela volta a valer.`,
+      confirmText: 'Remover',
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      this.keys.set(await this.api.deleteApiKey(key.id));
+      await this.refreshProviders();
+    } catch (error) {
+      this.toast.error(apiErrorMessage(error));
+    }
+  }
+
+  private async refreshProviders(): Promise<void> {
+    this.providers.set(await this.api.providers());
+    if (this.providerConfigured()) this.loadModels();
   }
 
   protected selectProvider(provider: 'google' | 'openai'): void {

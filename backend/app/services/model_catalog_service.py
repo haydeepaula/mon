@@ -2,7 +2,7 @@ import logging
 import time
 
 from app.container import get_llm_factory
-from app.core.config import get_settings
+from app.services.credentials_service import get_key_resolver
 from app.domain.entities import ChatMessage, ModelInfo
 
 logger = logging.getLogger(__name__)
@@ -18,11 +18,10 @@ class ModelCatalogService:
         self.factory = get_llm_factory()
 
     def providers(self) -> list[dict]:
-        settings = get_settings()
         return [
             {"id": "google", "name": "Google Gemini", "configured": self.factory.is_configured("google")},
             {"id": "openai", "name": "OpenAI", "configured": self.factory.is_configured("openai")},
-            {"id": "cohere", "name": "Cohere (rerank)", "configured": bool(settings.cohere_api_key)},
+            {"id": "cohere", "name": "Cohere (rerank)", "configured": bool(get_key_resolver()("cohere"))},
         ]
 
     def list_models(self, provider: str) -> list[ModelInfo]:

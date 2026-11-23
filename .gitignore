@@ -27,3 +27,5 @@ data/sources/*
 .idea/
 .DS_Store
 Thumbs.db
+docs/cefet/*
+docs/tcc/TCC_Introducao_reorganizada_e_Metodologia.docx

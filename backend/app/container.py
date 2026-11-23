@@ -14,6 +14,7 @@ from app.infrastructure.ocr.tesseract_ocr import TesseractOcrEngine
 from app.infrastructure.rerank.cohere_reranker import CohereReranker, PassthroughReranker
 from app.infrastructure.storage.local_storage import LocalFileStorage
 from app.infrastructure.vectorstore.qdrant_store import QdrantVectorStore
+from app.services.credentials_service import get_key_resolver
 from app.services.settings_service import RagSettings
 
 
@@ -29,17 +30,20 @@ def get_vector_store() -> QdrantVectorStore:
 
 
 def get_embedder() -> EmbeddingProvider:
-    settings = get_settings()
-    if not settings.google_api_key:
-        raise ProviderNotConfiguredError("GOOGLE_API_KEY não configurada: necessária para os embeddings.")
-    return _embedder()
+    api_key = get_key_resolver()("google")
+    if not api_key:
+        raise ProviderNotConfiguredError(
+            "Chave da Google não configurada: necessária para os embeddings. Cadastre-a em Modelos e RAG."
+        )
+    return _embedder(api_key)
 
 
-@lru_cache
-def _embedder() -> EmbeddingProvider:
+@lru_cache(maxsize=4)
+def _embedder(api_key: str) -> EmbeddingProvider:
+    # Um cliente por chave: trocar a chave na interface cria um cliente novo.
     settings = get_settings()
     return GoogleEmbeddingProvider(
-        api_key=settings.google_api_key,
+        api_key=api_key,
         model=settings.embedding_model,
         dimensions=settings.embedding_dimensions,
         batch_size=settings.embedding_batch_size,
@@ -63,7 +67,7 @@ def get_file_storage() -> LocalFileStorage:
 
 
 def get_llm_factory() -> LLMProviderFactory:
-    return LLMProviderFactory(get_settings())
+    return LLMProviderFactory(get_settings(), get_key_resolver())
 
 
 def build_llm(rag: RagSettings) -> LLMProvider:
@@ -71,7 +75,7 @@ def build_llm(rag: RagSettings) -> LLMProvider:
 
 
 def build_reranker(rag: RagSettings) -> Reranker:
-    api_key = get_settings().cohere_api_key
+    api_key = get_key_resolver()("cohere") if rag.rerank_enabled else None
     if rag.rerank_enabled and api_key:
         return CohereReranker(api_key, rag.rerank_model)
     return PassthroughReranker()

@@ -17,6 +17,7 @@ Versões fixadas em `backend/requirements.txt`, `frontend/package-lock.json` e `
 | qdrant-client | 1.19.1 | Apache-2.0 | Cliente do banco vetorial Qdrant | https://github.com/qdrant/qdrant-client |
 | PyJWT | 2.15.1 | MIT | Tokens de acesso JWT (RFC 7519) | https://pyjwt.readthedocs.io |
 | bcrypt | 5.0.0 | Apache-2.0 | Hash de senhas | https://github.com/pyca/bcrypt |
+| cryptography | 50.0.2 | Apache-2.0 / BSD | Criptografia (Fernet) das chaves de API cadastradas | https://github.com/pyca/cryptography |
 | google-genai | 2.29.0 | Apache-2.0 | SDK do Gemini: geração de texto, listagem de modelos e embeddings | https://googleapis.github.io/python-genai/ |
 | openai | 3.29.0 | Apache-2.0 | SDK da OpenAI (Responses API e listagem de modelos) | https://github.com/openai/openai-python |
 | cohere | 7.2.0 | MIT | SDK da Cohere (rerank) | https://github.com/cohere-ai/cohere-python |

@@ -3,6 +3,8 @@ import { inject, Injectable } from '@angular/core';
 import { firstValueFrom, Observable } from 'rxjs';
 
 import {
+  ApiKeyStatus,
+  ApiKeyTest,
   Colecao,
   DocumentItem,
   DocumentStats,
@@ -118,6 +120,23 @@ export class AdminApi {
 
   updateSettings(changes: Partial<RagSettings>) {
     return firstValueFrom(this.http.put<RagSettings>('/api/admin/settings', changes));
+  }
+
+  // Chaves de API (gravadas criptografadas no servidor; nunca voltam completas)
+  apiKeys() {
+    return firstValueFrom(this.http.get<ApiKeyStatus[]>('/api/admin/api-keys'));
+  }
+
+  saveApiKey(provider: string, apiKey: string, testar = true) {
+    return firstValueFrom(this.http.put<ApiKeyStatus[]>(`/api/admin/api-keys/${provider}`, { api_key: apiKey, testar }));
+  }
+
+  deleteApiKey(provider: string) {
+    return firstValueFrom(this.http.delete<ApiKeyStatus[]>(`/api/admin/api-keys/${provider}`));
+  }
+
+  testApiKey(provider: string, apiKey?: string) {
+    return firstValueFrom(this.http.post<ApiKeyTest>(`/api/admin/api-keys/${provider}/test`, { api_key: apiKey || null }));
   }
 
   providers() {

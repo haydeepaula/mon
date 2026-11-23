@@ -48,3 +48,33 @@ class ModelTestResponse(BaseModel):
     latency_ms: int | None = None
     reply: str | None = None
     error: str | None = None
+
+
+class ApiKeyStatus(BaseModel):
+    id: str
+    nome: str
+    uso: str
+    variavel: str
+    configurada: bool
+    origem: Literal["interface", "ambiente", "nenhuma"]
+    mascara: str | None
+    atualizada_em: str | None
+    ilegivel: bool
+
+
+class ApiKeyIn(BaseModel):
+    api_key: str = Field(min_length=8, max_length=500)
+    testar: bool = True
+
+
+class ApiKeyTestIn(BaseModel):
+    # Sem chave, testa a chave efetiva atual do provedor.
+    api_key: str | None = Field(None, min_length=8, max_length=500)
+
+
+class ApiKeyTestOut(BaseModel):
+    ok: bool
+    detalhe: str | None = None
+    erro: str | None = None
+    latencia_ms: int = 0
+

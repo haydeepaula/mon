@@ -14,7 +14,11 @@
 cp .env.example .env
 ```
 
-Edite o `.env` e preencha as chaves. Principais variáveis:
+Edite o `.env` e preencha as chaves. Elas também podem ser cadastradas ou trocadas depois, pela interface,
+em **Modelos e RAG → Chaves de API**: a chave é testada no provedor, gravada **criptografada** no banco
+(Fernet, com chave derivada de `JWT_SECRET`), tem prioridade sobre a do `.env` e passa a valer na API e no
+worker em até 10 segundos, sem reiniciar. Se o `JWT_SECRET` for trocado, as chaves cadastradas pela interface
+deixam de ser legíveis e precisam ser cadastradas de novo. Principais variáveis:
 
 | Variável | Padrão | Descrição |
 |---|---|---|
@@ -106,8 +110,8 @@ npm start                           # http://localhost:4200, com proxy para a AP
 
 | Sintoma | Causa provável | Solução |
 |---|---|---|
-| Documento com status "Falhou" e mensagem sobre `GOOGLE_API_KEY` | Chave não configurada | Preencha o `.env`, recrie backend/worker e clique em **Reindexar** |
-| Lista de modelos vazia | Chave do provedor ausente ou inválida | Verifique a chave; use o botão **Testar** |
+| Documento com status "Falhou" e mensagem sobre a chave da Google | Chave não configurada | Cadastre a chave em **Modelos e RAG → Chaves de API** (ou no `.env`, recriando backend/worker) e clique em **Reindexar** |
+| Lista de modelos vazia | Chave do provedor ausente ou inválida | Use **Testar** em **Chaves de API** e, se preciso, **Trocar** |
 | Respostas sem rerank | `COHERE_API_KEY` ausente ou rerank desligado | Configure a chave ou ative em **Modelos e RAG** |
 | Erro de dimensões no Qdrant | Modelo de embedding alterado | `docker compose down -v` (apaga dados) e reindexe |
 | `.doc`/`.ppt` não processa | Conversão do LibreOffice falhou | Veja o log do job; salve o arquivo em formato moderno |

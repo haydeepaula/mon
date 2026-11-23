@@ -164,6 +164,25 @@ export interface Provider {
   configured: boolean;
 }
 
+export interface ApiKeyStatus {
+  id: 'google' | 'openai' | 'cohere';
+  nome: string;
+  uso: string;
+  variavel: string;
+  configurada: boolean;
+  origem: 'interface' | 'ambiente' | 'nenhuma';
+  mascara: string | null;
+  atualizada_em: string | null;
+  ilegivel: boolean;
+}
+
+export interface ApiKeyTest {
+  ok: boolean;
+  detalhe: string | null;
+  erro: string | null;
+  latencia_ms: number;
+}
+
 export interface ModelInfo {
   id: string;
   provider: string;

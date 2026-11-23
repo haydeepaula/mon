@@ -182,3 +182,74 @@
     width: 100%;
   }
 }
+
+/* Chaves de API */
+.key-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.key-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.key-meta {
+  margin-top: 4px;
+  color: var(--text-2);
+
+  .warn {
+    color: var(--warning);
+  }
+}
+
+.key-test {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+
+  &.ok {
+    color: var(--success);
+  }
+
+  &.fail {
+    color: var(--danger);
+  }
+}
+
+.key-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+
+  .input {
+    flex: 1;
+    min-width: 260px;
+    height: 34px;
+  }
+
+  .check {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--text-2);
+  }
+}
+
+.key-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+

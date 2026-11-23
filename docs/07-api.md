@@ -59,6 +59,10 @@ exigem o papel de administrador.
 | GET | `/admin/providers` | Provedores e se têm chave configurada |
 | GET | `/admin/models/{provider}` | Modelos disponíveis no provedor (`google` ou `openai`) |
 | POST | `/admin/models/test` | Testa um modelo (`{provider, model}`) |
+| GET | `/admin/api-keys` | Situação das chaves (`google`, `openai`, `cohere`): configurada, origem (interface, ambiente ou nenhuma) e máscara; nunca a chave completa |
+| PUT | `/admin/api-keys/{provider}` | Cadastra ou troca a chave (`{api_key, testar}`); com `testar`, só grava se o provedor aceitar |
+| DELETE | `/admin/api-keys/{provider}` | Remove a chave cadastrada; volta a valer a do `.env`, se houver |
+| POST | `/admin/api-keys/{provider}/test` | Testa a chave informada (`{api_key}`) ou a chave atual |
 
 ## Avaliação (**admin**)
 
